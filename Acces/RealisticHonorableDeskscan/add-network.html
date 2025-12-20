@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Access Network</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #000000;
+            min-height: 100vh;
+            padding: 20px;
+            color: #ffffff;
+            line-height: 1.6;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        body.light-mode {
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            border-radius: 50%;
+            padding: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.3rem;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            color: #ffffff;
+        }
+
+        body.light-mode .theme-toggle {
+            color: rgba(0, 0, 0, 0.7);
+        }
+
+        body.light-mode .theme-toggle:hover {
+            color: #000000;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 40px auto;
+            background: #1a1a1a;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .container {
+            background: white;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+            color: white;
+            position: relative;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .network-info {
+            background: #2a2a2a;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .network-info {
+            background: #f8f9fa;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #444;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .info-item {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: #ffffff;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .info-label {
+            color: #495057;
+        }
+
+        .info-value {
+            font-family: 'Monaco', monospace;
+            font-size: 0.8rem;
+            color: #b0b0b0;
+            max-width: 200px;
+            text-align: right;
+            word-break: break-all;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .info-value {
+            color: #6c757d;
+        }
+
+        .copy-btn {
+            background: #555;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+
+        body.light-mode .copy-btn {
+            background: #6c757d;
+            color: white;
+        }
+
+        .copy-btn:hover {
+            background: #666;
+            transform: translateY(-1px);
+        }
+
+        body.light-mode .copy-btn:hover {
+            background: #5a6268;
+        }
+
+        .copy-btn.copied {
+            background: #38a169;
+        }
+
+        .wallet-options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .wallet-btn {
+            background: #2a2a2a;
+            border: 2px solid #444;
+            border-radius: 15px;
+            padding: 20px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: #ffffff;
+        }
+
+        body.light-mode .wallet-btn {
+            background: white;
+            border: 2px solid #e9ecef;
+            color: #495057;
+        }
+
+        .wallet-btn:hover {
+            border-color: #667eea;
+            background: #333;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        body.light-mode .wallet-btn:hover {
+            background: #f8f9ff;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+        }
+
+        .wallet-icon {
+            font-size: 1.5rem;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .wallet-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 3px;
+        }
+
+        .wallet-desc {
+            font-size: 0.75rem;
+            color: #b0b0b0;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .wallet-desc {
+            color: #6c757d;
+        }
+
+        .manual-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 15px 20px;
+            width: 100%;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+        }
+
+        .manual-btn:hover {
+            background: #495057;
+            transform: translateY(-1px);
+        }
+
+        .manual-instructions {
+            background: #2a2a2a;
+            border: 1px solid #667eea;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .manual-instructions {
+            background: #fff8e1;
+            border: 1px solid #ffcc02;
+        }
+
+        .manual-instructions h4 {
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .manual-instructions h4 {
+            color: #f57c00;
+        }
+
+        .manual-instructions ol {
+            color: #b0b0b0;
+            padding-left: 18px;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .manual-instructions ol {
+            color: #ef6c00;
+        }
+
+        .manual-instructions li {
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .status-message {
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            display: none;
+            text-align: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .status-info {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #b0b0b0;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .status-info {
+            background: #cce7ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 10px 15px;
+            border-radius: 10px;
+            border: 1px solid #667eea;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+
+        .back-link:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .theme-icon {
+            font-size: 1rem;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.85rem;
+            color: #666;
+            background: #0a0a0a;
+            margin-top: 40px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        body.light-mode .footer {
+            color: #888;
+            background: #f0f0f0;
+        }
+
+        .copy-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #38a169;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(56, 161, 105, 0.3);
+            z-index: 10000;
+            display: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .copy-notification.show {
+            display: block;
+            animation: fadeInOut 2.5s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 20px auto;
+                border-radius: 15px;
+            }
+
+            .content {
+                padding: 25px 20px;
+            }
+
+            .wallet-options {
+                grid-template-columns: 1fr;
+            }
+
+            .info-value {
+                max-width: 150px;
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <i class="fas fa-moon theme-icon"></i>
+            </button>
+            <div class="logo">
+                <img src="logo.png" alt="Access Network">
+            </div>
+            <div class="title">Access Network</div>
+            <div class="subtitle">Add to your wallet</div>
+        </div>
+
+        <div class="content">
+            <div id="status" class="status-message"></div>
+
+            <div class="network-info">
+                <div class="info-item">
+                    <span class="info-label">Network Name</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="info-value">Access Network</span>
+                        <button class="copy-btn" onclick="copyToClipboard('Access Network', this)">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <span class="info-label">RPC URL</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="info-value">https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000</span>
+                        <button class="copy-btn" onclick="copyToClipboard('https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000', this)">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <span class="info-label">Chain ID</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="info-value">22888</span>
+                        <button class="copy-btn" onclick="copyToClipboard('22888', this)">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <span class="info-label">Symbol</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="info-value">ACCESS</span>
+                        <button class="copy-btn" onclick="copyToClipboard('ACCESS', this)">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <span class="info-label">Explorer</span>
+                    <div style="display: flex; align-items: center;">
+                        <span class="info-value">access-explorer.html</span>
+                        <button class="copy-btn" onclick="copyToClipboard('https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-explorer.html', this)">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wallet-options">
+                <div class="wallet-btn" onclick="connectBrowserWallet()">
+                    <div class="wallet-icon">
+                        <i class="fab fa-firefox-browser"></i>
+                    </div>
+                    <div class="wallet-name">Browser Wallet</div>
+                    <div class="wallet-desc">MetaMask, Trust Wallet</div>
+                </div>
+            </div>
+
+            <button id="manual-btn" class="manual-btn" onclick="toggleManualInstructions()">
+                <i class="fas fa-book"></i>
+                Manual Setup Guide
+            </button>
+
+            <div id="manual-instructions" class="manual-instructions">
+                <h4><i class="fas fa-tools"></i> Manual Setup Steps</h4>
+                <ol>
+                    <li>Open your digital wallet app</li>
+                    <li>Go to network settings</li>
+                    <li>Click "Add Custom Network"</li>
+                    <li>Enter the network information shown above</li>
+                    <li>Save settings and switch to Access Network</li>
+                    <li>Done! You're now connected to Access Network</li>
+                </ol>
+            </div>
+
+            <a href="/" class="back-link">
+                <i class="fas fa-arrow-left"></i>
+                Back to Homepage
+            </a>
+        </div>
+    </div>
+
+    <div class="footer">
+        © 2025 AccessScan. All rights reserved.
+    </div>
+
+    <div id="copyNotification" class="copy-notification">
+        <i class="fas fa-check-circle"></i> Successfully Copied!
+    </div>
+
+    <script>
+        const accessNetwork = {
+            chainId: '0x5968',
+            chainName: 'Access Network',
+            nativeCurrency: {
+                name: 'Access Coin',
+                symbol: 'ACCESS',
+                decimals: 18
+            },
+            rpcUrls: ['https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000'],
+            blockExplorerUrls: ['https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/transaction-details.html?hash='],
+            iconUrls: [
+                'https://gateway.pinata.cloud/ipfs/bafybeicc2meeaucf6s6zljq2xshulfcd7k3zlid3qwg2hrfbnlc2qexvyi',
+                'https://gateway.pinata.cloud/ipfs/bafybeicc2meeaucf6s6zljq2xshulfcd7k3zlid3qwg2hrfbnlc2qexvyi'
+            ]
+        };
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = message;
+            statusEl.className = `status-message status-${type}`;
+            statusEl.style.display = 'block';
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 4000);
+            }
+        }
+
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalContent = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.classList.add('copied');
+
+                const notification = document.getElementById('copyNotification');
+                notification.classList.add('show');
+
+                setTimeout(() => {
+                    button.innerHTML = originalContent;
+                    button.classList.remove('copied');
+                    notification.classList.remove('show');
+                }, 2000);
+            }).catch(() => {
+                showStatus('Copy failed, please try again', 'error');
+            });
+        }
+
+        async function connectBrowserWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                showStatus('Connecting to browser wallet...', 'info');
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [accessNetwork]
+                    });
+
+                    showStatus('Access Network added successfully!', 'success');
+
+                    setTimeout(async () => {
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_switchEthereumChain',
+                                params: [{ chainId: accessNetwork.chainId }]
+                            });
+                            showStatus('Successfully switched to Access Network!', 'success');
+                        } catch (error) {
+                            console.log('Network switch not performed automatically');
+                        }
+                    }, 1000);
+
+                } catch (error) {
+                    console.error('Error adding network:', error);
+                    if (error.code === 4001) {
+                        showStatus('Request rejected by user', 'error');
+                    } else {
+                        showStatus('Failed to add network, try manual method', 'error');
+                    }
+                }
+            } else {
+                showStatus('No wallet installed, please install MetaMask or another wallet', 'error');
+            }
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.querySelector('.theme-icon');
+            
+            body.classList.toggle('light-mode');
+            
+            if (body.classList.contains('light-mode')) {
+                themeIcon.className = 'fas fa-sun theme-icon';
+                localStorage.setItem('theme', 'light');
+            } else {
+                themeIcon.className = 'fas fa-moon theme-icon';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        function toggleManualInstructions() {
+            const instructions = document.getElementById('manual-instructions');
+            const button = document.getElementById('manual-btn');
+
+            if (instructions.style.display === 'none' || !instructions.style.display) {
+                instructions.style.display = 'block';
+                button.innerHTML = '<i class="fas fa-eye-slash"></i> Hide Instructions';
+                showStatus('Follow the steps below to add the network manually', 'info');
+            } else {
+                instructions.style.display = 'none';
+                button.innerHTML = '<i class="fas fa-book"></i> Manual Setup Guide';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+                document.querySelector('.theme-icon').className = 'fas fa-sun theme-icon';
+            }
+            
+            showStatus('Choose your preferred method to add the network', 'info');
+        });
+    </script>
+</body>
+</html>

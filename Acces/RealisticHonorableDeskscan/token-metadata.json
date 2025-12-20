@@ -1,0 +1,12 @@
+
+{
+  "name": "Access Coin",
+  "symbol": "ACCESS",
+  "decimals": 18,
+  "description": "Access Network Native Token",
+  "website": "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev",
+  "logo": "https://gateway.pinata.cloud/ipfs/bafybeicc2meeaucf6s6zljq2xshulfcd7k3zlid3qwg2hrfbnlc2qexvyi",
+  "type": "ERC20",
+  "address": "0x0000000000000000000000000000000000000000",
+  "chainId": "0x5968"
+}

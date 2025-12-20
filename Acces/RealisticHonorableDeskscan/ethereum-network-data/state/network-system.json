@@ -1,0 +1,19 @@
+{
+  "blocks": [
+    {
+      "index": 0,
+      "timestamp": 1766255655819,
+      "transactions": [],
+      "previousHash": "0",
+      "nonce": 0,
+      "hash": "7ab3c3624d3c9e8061e446e7a1be4b32a5d04846e0e2cdbd39179cd67caa0d9a",
+      "merkleRoot": ""
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "lastSaved": 1766256882035,
+    "totalBlocks": 1,
+    "difficulty": 2
+  }
+}
