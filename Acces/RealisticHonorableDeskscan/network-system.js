@@ -797,6 +797,32 @@ class AccessNetwork extends EventEmitter {
       this.cleanupProtectionData();
     }
 
+    // 🔥 INSTANT WALLET NOTIFICATION - إرسال فوري للمحافظ المتصلة (قبل إنشاء بلوك)
+    // ⚡ Trust Wallet يحتاج التحديث فوراً - لا ننتظر 3 ثواني لإنشاء البلوك
+    if (this.instantWalletSync && fromAddress && !isSystemTransaction) {
+      const normalizedFromAddress = fromAddress.toLowerCase();
+      const newFromBalance = this.getBalance(normalizedFromAddress);
+      
+      // إرسال تحديث فوري للمرسل (balance deducted instantly)
+      this.instantWalletSync.notifyBalanceUpdate(
+        normalizedFromAddress,
+        newFromBalance,
+        'pending_deduction'  // pending state - not yet confirmed
+      ).catch(() => {});
+      
+      // إرسال تحديث فوري للمستقبل أيضاً
+      if (toAddress && !isContractDeployment) {
+        const normalizedToAddress = toAddress.toLowerCase();
+        const newToBalance = this.getBalance(normalizedToAddress);
+        
+        this.instantWalletSync.notifyBalanceUpdate(
+          normalizedToAddress,
+          newToBalance,
+          'pending_credit'
+        ).catch(() => {});
+      }
+    }
+
     // بث المعاملة للشبكة (فقط للمعاملات الخارجية)
     if (!transaction.internal) {
       this.broadcastTransaction(transaction);
