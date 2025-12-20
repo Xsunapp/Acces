@@ -676,16 +676,18 @@ class AccessNetwork extends EventEmitter {
 
     // ✅ CONTRACT: Allow 0 amount for contract deployment and contract calls
     // Contract calls can have amount = 0 (e.g., view functions, read-only calls)
+    // Also allow 0 amount for normal transfers (just paying gas)
     const hasContractData = transaction.inputData || transaction.data || transaction.input;
     const isContractCall = toAddress && hasContractData && hasContractData.length > 2;
 
-    // التحقق من صحة البيانات - لكن نسمح بالعقود
-    if (!isContractDeployment && !isContractCall && (!toAddress || amount <= 0)) {
-      // إلغاء الحجز في حالة الخطأ
+    // التحقق من صحة البيانات - نسمح بـ 0 amount إذا كان هناك toAddress صحيح
+    // 0 amount is valid for contract calls, normal transfers (gas-only), and contract deployments
+    if (!isContractDeployment && !isContractCall && !toAddress) {
+      // إلغاء الحجز في حالة الخطأ - فقط إذا لم يكن هناك toAddress
       if (fromAddress && !isSystemTransaction) {
         this.releaseReservation(txId);
       }
-      throw new Error('Invalid transaction data');
+      throw new Error('Invalid transaction data: No recipient address');
     }
 
     // التحقق الإضافي للمعاملات العادية فقط (ليس للعقود)
@@ -709,16 +711,11 @@ class AccessNetwork extends EventEmitter {
       transaction.toAddress = ''; // Ensure it's empty for contract deployment
     }
 
-    // ✅ CONTRACT: Allow 0 amount for contract deployment AND contract calls
-    // التحقق من صحة المبلغ - لكن نسمح بصفر للعقود
-    if (!isContractDeployment && !isContractCall && (!transaction.amount || transaction.amount <= 0)) {
-      throw new Error('Transaction amount must be higher than 0');
-    }
-
-    // التأكد من أن المبلغ رقم صحيح
-    const numericAmount = parseFloat(transaction.amount) || 0; // ✅ CONTRACT: can be 0
-    if (!isContractDeployment && !isContractCall && (isNaN(numericAmount) || numericAmount <= 0)) {
-      throw new Error('Invalid transaction amount');
+    // ✅ ALLOW 0-AMOUNT TRANSFERS: Valid for gas-only transfers, contract calls, and deployments
+    // التحقق من صحة المبلغ - نسمح بـ 0 للجميع
+    const numericAmount = parseFloat(transaction.amount) || 0; // ✅ 0 amount is valid
+    if (isNaN(numericAmount)) {
+      throw new Error('Invalid transaction amount - must be a valid number');
     }
 
     // تحديث المبلغ بالقيمة الرقمية الصحيحة
@@ -906,9 +903,9 @@ class AccessNetwork extends EventEmitter {
       // ✅ التحقق من صحة البيانات (مع دعم contract deployment and calls)
       // For contract deployment: to can be empty, amount can be 0
       // For contract calls: to = contract address, amount can be 0
-      // For normal transfer: to must exist, amount must be > 0
-      if (!isContractDeployment && !isContractCall && (!toAddress || amount <= 0)) {
-        throw new Error('Invalid transaction data');
+      // For normal transfer: to must exist, amount CAN be 0 (gas-only transfer)
+      if (!isContractDeployment && !isContractCall && !toAddress) {
+        throw new Error('Invalid transaction data: No recipient address');
       }
 
       // ✅ التحقق من تنسيق العناوين (مع دعم contract deployment)
