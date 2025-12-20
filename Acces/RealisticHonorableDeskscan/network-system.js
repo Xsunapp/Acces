@@ -358,33 +358,11 @@ class AccessNetwork extends EventEmitter {
   }
 
   // حفظ حالة الأرصدة - قراءة من accessStateStorage للحصول على الأرصدة الصحيحة
+  // ⚠️ DISABLED: Do NOT save monolithic state - causes balance reversions
   async saveState() {
-    try {
-      // ✅ تحديث this.balances من accessStateStorage قبل الحفظ
-      if (this.accessStateStorage) {
-        const accountsCache = this.accessStateStorage.accountsCache;
-        if (accountsCache && accountsCache.size > 0) {
-          for (const [address, account] of accountsCache.entries()) {
-            const balance = parseFloat(account.balance) / 1e18;
-            this.balances.set(address.toLowerCase(), balance);
-          }
-        }
-      }
-
-      const stateData = {
-        balances: Object.fromEntries(this.balances),
-        reservedBalances: Object.fromEntries(this.reservedBalances),
-        metadata: {
-          totalAccounts: this.balances.size,
-          lastSaved: Date.now(),
-          totalSupply: this.getTotalSupply()
-        }
-      };
-
-      await this.ethereumStorage.saveState(stateData);
-    } catch (error) {
-      console.error('❌ Error saving state:', error);
-    }
+    // NO-OP: Balances persist ONLY through individual account files (updateBalanceInStateTrie)
+    // Never save to monolithic balances.json - it causes stale data when reloaded
+    return true;
   }
 
   // تحميل حالة الأرصدة
@@ -1111,14 +1089,16 @@ class AccessNetwork extends EventEmitter {
         }
       }
 
-      // ✅ حفظ فوري لملف balances.json بالكامل بعد كل معاملة ناجحة
-      if (this.ethereumStorage) {
-        const balancesObj = {};
-        for (const [addr, bal] of this.balances.entries()) {
-          balancesObj[addr] = bal;
-        }
-        await this.ethereumStorage.saveState({ balances: balancesObj });
-      }
+      // ⚠️ DISABLED: Do NOT save monolithic balances.json - causes balance reversions
+      // Balances persist ONLY through individual account files via updateBalanceInStateTrie()
+      // The monolithic saveState() was causing stale data issues when reloaded
+      // if (this.ethereumStorage) {
+      //   const balancesObj = {};
+      //   for (const [addr, bal] of this.balances.entries()) {
+      //     balancesObj[addr] = bal;
+      //   }
+      //   await this.ethereumStorage.saveState({ balances: balancesObj });
+      // }
 
     } catch (error) {
       console.error('❌ TRANSACTION PROCESSING FAILED:', error);
@@ -1211,7 +1191,8 @@ class AccessNetwork extends EventEmitter {
 
       // حفظ البلوكتشين والحالة بعد تعدين كتلة جديدة
       this.saveChain();
-      this.saveState();
+      // ⚠️ DISABLED: this.saveState() - Individual account files are the only source of truth
+      // this.saveState(); 
       this.saveMempool();
 
       this.emit('blockMined', block);
@@ -1328,23 +1309,12 @@ class AccessNetwork extends EventEmitter {
   }
 
   // حفظ State في التخزين الدائم (async للاستدعاء المستقبلي فقط)
+  // ⚠️ DISABLED: This method is deprecated - use updateBalanceInStateTrie() instead
+  // Individual account files are the only source of truth for balances
   async saveStateToStorage() {
-    try {
-      const balanceObj = {};
-      for (const [address, balance] of this.balances.entries()) {
-        balanceObj[address] = balance;
-      }
-
-      await this.storage.saveState({
-        balances: balanceObj,
-        lastUpdate: Date.now(),
-        blockHeight: this.chain.length - 1
-      });
-
-      // ✅ Removed verbose logging for performance
-    } catch (error) {
-      console.error('Error saving state to storage:', error);
-    }
+    // NO-OP: Balances must ONLY persist through individual account files
+    // Never save monolithic state to prevent stale data issues
+    return true;
   }
 
   // Update balance for an address (for external wallets) - ETHEREUM-STYLE

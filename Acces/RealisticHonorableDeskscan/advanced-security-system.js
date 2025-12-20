@@ -610,7 +610,8 @@ class AdvancedSecuritySystem extends EventEmitter {
     }
 
     // حفظ حالة البلوك تشين الحالية
-    this.blockchain.saveState();
+    // ⚠️ DISABLED: this.blockchain.saveState() - causes balance reversions
+    // this.blockchain.saveState();
     this.blockchain.saveChain();
 
     if (!this.silentMode) {
@@ -831,7 +832,8 @@ class AdvancedSecuritySystem extends EventEmitter {
     }
 
     // حفظ جميع بيانات الأمان
-    this.blockchain.saveState();
+    // ⚠️ DISABLED: this.blockchain.saveState() - causes balance reversions
+    // this.blockchain.saveState();
     this.createSecureBackup();
 
     if (!this.silentMode) {
