@@ -4894,7 +4894,15 @@ class NetworkNode {
     try {
       const { to, data } = callData;
 
+      // ✅ التحقق من أن العنوان صحيح
+      if (!to || !this.isValidEthereumAddress(to)) {
+        console.warn(`⚠️ eth_call on invalid address: ${to}`);
+        throw new Error('Invalid contract address');
+      }
+
+      // ✅ التحقق من أن البيانات موجودة
       if (!data || data.length < 10) {
+        console.log(`⚠️ eth_call with no function data on ${to}, treating as EOA`);
         return '0x';
       }
 
@@ -4938,11 +4946,15 @@ class NetworkNode {
           return '0x' + totalSupplyInWei.toString(16).padStart(64, '0');
 
         default:
-          console.log(`🔍 Unknown function selector: ${functionSelector}`);
+          // ⚠️ المشكلة الحقيقية: Unknown function selector على EOA
+          console.log(`🔍 Unknown function selector: ${functionSelector} on address ${to}`);
+          console.log(`⚠️ هذا يشير إلى أن العنوان ${to} قد يكون عادياً (EOA) وليس contract`);
+          // ✅ ترجع 0x (بدون بيانات) لتخبر MetaMask أن العنوان ليس contract
           return '0x';
       }
     } catch (error) {
       console.error('Error handling contract call:', error);
+      // ✅ عند حدوث خطأ، ترجع 0x (هذا يخبر MetaMask أن العنوان ليس contract صحيح)
       return '0x';
     }
   }
