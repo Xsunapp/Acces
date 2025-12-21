@@ -4945,16 +4945,24 @@ class NetworkNode {
           const totalSupplyInWei = Math.floor(totalSupply * 1e18);
           return '0x' + totalSupplyInWei.toString(16).padStart(64, '0');
 
+        case '0x01ffc9a7': // supportsInterface(bytes4) - ERC165
+          // ✅ للعناوين العادية (EOA)، نقول أننا لا ندعم أي interfaces
+          console.log(`🔍 supportsInterface call on ${to} - returning false for EOA`);
+          return '0x0000000000000000000000000000000000000000000000000000000000000000'; // false
+
+        case '0x06fdde03': // name()
+          const nameFunc = Buffer.from('Access Coin').toString('hex');
+          return '0x' + '0'.repeat(64) + nameFunc.length.toString(16).padStart(64, '0') + nameFunc.padEnd(64, '0');
+
         default:
-          // ⚠️ المشكلة الحقيقية: Unknown function selector على EOA
-          console.log(`🔍 Unknown function selector: ${functionSelector} on address ${to}`);
-          console.log(`⚠️ هذا يشير إلى أن العنوان ${to} قد يكون عادياً (EOA) وليس contract`);
-          // ✅ ترجع 0x (بدون بيانات) لتخبر MetaMask أن العنوان ليس contract
+          // ⚠️ Unknown function selector - ترجع فارغ تماماً (zero) لتخبر MetaMask أن العنوان EOA
+          console.log(`🔍 Unknown function selector: ${functionSelector} on address ${to} - this is EOA, not contract`);
+          // ✅ ترجع 0x (فارغ تماماً) - هذا هو الرد الصحيح للـ EOA
           return '0x';
       }
     } catch (error) {
       console.error('Error handling contract call:', error);
-      // ✅ عند حدوث خطأ، ترجع 0x (هذا يخبر MetaMask أن العنوان ليس contract صحيح)
+      // ✅ عند حدوث خطأ، ترجع 0x (هذا يخبر MetaMask أن العنوان ليس contract)
       return '0x';
     }
   }
