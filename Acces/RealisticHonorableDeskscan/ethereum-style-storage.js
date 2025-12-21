@@ -438,13 +438,32 @@ class EthereumStyleStorage {
   }
 
   // حفظ حالة الأرصدة
-  // ⚠️ DISABLED: Do NOT save monolithic balances.json - causes balance reversions
-  // Individual accounts are persisted via saveAccountState() instead
   async saveState(stateData) {
-    // NO-OP: This method is disabled to prevent balance inconsistencies
-    // Balances ONLY persist through individual account files in the accounts directory
-    // Never save to balances.json as it can cause stale data issues
-    return true;
+    try {
+      const stateFile = path.join(this.stateDir, 'balances.json');
+      fs.writeFileSync(stateFile, JSON.stringify(stateData, null, 2));
+
+      // حفظ كل حساب منفرداً أيضاً
+      if (stateData.balances) {
+        for (const [address, balance] of Object.entries(stateData.balances)) {
+          await this.saveAccountState(address, {
+            balance: balance,
+            nonce: 0
+          });
+        }
+      }
+
+      // عرض رسالة واحدة فقط كل 5 دقائق
+      const now = Date.now();
+      if (!this.lastStateSaveLog || (now - this.lastStateSaveLog) > 300000) {
+        // State saved silently
+        this.lastStateSaveLog = now;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error saving state:', error);
+      return false;
+    }
   }
 
   // حفظ mempool

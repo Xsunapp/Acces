@@ -358,11 +358,33 @@ class AccessNetwork extends EventEmitter {
   }
 
   // حفظ حالة الأرصدة - قراءة من accessStateStorage للحصول على الأرصدة الصحيحة
-  // ⚠️ DISABLED: Do NOT save monolithic state - causes balance reversions
   async saveState() {
-    // NO-OP: Balances persist ONLY through individual account files (updateBalanceInStateTrie)
-    // Never save to monolithic balances.json - it causes stale data when reloaded
-    return true;
+    try {
+      // ✅ تحديث this.balances من accessStateStorage قبل الحفظ
+      if (this.accessStateStorage) {
+        const accountsCache = this.accessStateStorage.accountsCache;
+        if (accountsCache && accountsCache.size > 0) {
+          for (const [address, account] of accountsCache.entries()) {
+            const balance = parseFloat(account.balance) / 1e18;
+            this.balances.set(address.toLowerCase(), balance);
+          }
+        }
+      }
+
+      const stateData = {
+        balances: Object.fromEntries(this.balances),
+        reservedBalances: Object.fromEntries(this.reservedBalances),
+        metadata: {
+          totalAccounts: this.balances.size,
+          lastSaved: Date.now(),
+          totalSupply: this.getTotalSupply()
+        }
+      };
+
+      await this.ethereumStorage.saveState(stateData);
+    } catch (error) {
+      console.error('❌ Error saving state:', error);
+    }
   }
 
   // تحميل حالة الأرصدة
@@ -676,18 +698,16 @@ class AccessNetwork extends EventEmitter {
 
     // ✅ CONTRACT: Allow 0 amount for contract deployment and contract calls
     // Contract calls can have amount = 0 (e.g., view functions, read-only calls)
-    // Also allow 0 amount for normal transfers (just paying gas)
     const hasContractData = transaction.inputData || transaction.data || transaction.input;
     const isContractCall = toAddress && hasContractData && hasContractData.length > 2;
 
-    // التحقق من صحة البيانات - نسمح بـ 0 amount إذا كان هناك toAddress صحيح
-    // 0 amount is valid for contract calls, normal transfers (gas-only), and contract deployments
-    if (!isContractDeployment && !isContractCall && !toAddress) {
-      // إلغاء الحجز في حالة الخطأ - فقط إذا لم يكن هناك toAddress
+    // التحقق من صحة البيانات - لكن نسمح بالعقود
+    if (!isContractDeployment && !isContractCall && (!toAddress || amount <= 0)) {
+      // إلغاء الحجز في حالة الخطأ
       if (fromAddress && !isSystemTransaction) {
         this.releaseReservation(txId);
       }
-      throw new Error('Invalid transaction data: No recipient address');
+      throw new Error('Invalid transaction data');
     }
 
     // التحقق الإضافي للمعاملات العادية فقط (ليس للعقود)
@@ -711,11 +731,16 @@ class AccessNetwork extends EventEmitter {
       transaction.toAddress = ''; // Ensure it's empty for contract deployment
     }
 
-    // ✅ ALLOW 0-AMOUNT TRANSFERS: Valid for gas-only transfers, contract calls, and deployments
-    // التحقق من صحة المبلغ - نسمح بـ 0 للجميع
-    const numericAmount = parseFloat(transaction.amount) || 0; // ✅ 0 amount is valid
-    if (isNaN(numericAmount)) {
-      throw new Error('Invalid transaction amount - must be a valid number');
+    // ✅ CONTRACT: Allow 0 amount for contract deployment AND contract calls
+    // التحقق من صحة المبلغ - لكن نسمح بصفر للعقود
+    if (!isContractDeployment && !isContractCall && (!transaction.amount || transaction.amount <= 0)) {
+      throw new Error('Transaction amount must be higher than 0');
+    }
+
+    // التأكد من أن المبلغ رقم صحيح
+    const numericAmount = parseFloat(transaction.amount) || 0; // ✅ CONTRACT: can be 0
+    if (!isContractDeployment && !isContractCall && (isNaN(numericAmount) || numericAmount <= 0)) {
+      throw new Error('Invalid transaction amount');
     }
 
     // تحديث المبلغ بالقيمة الرقمية الصحيحة
@@ -795,32 +820,6 @@ class AccessNetwork extends EventEmitter {
     // Clean up old protection data periodically (every 100 transactions)
     if (this.processedTxHashes.size % 100 === 0) {
       this.cleanupProtectionData();
-    }
-
-    // 🔥 INSTANT WALLET NOTIFICATION - إرسال فوري للمحافظ المتصلة (قبل إنشاء بلوك)
-    // ⚡ Trust Wallet يحتاج التحديث فوراً - لا ننتظر 3 ثواني لإنشاء البلوك
-    if (this.instantWalletSync && fromAddress && !isSystemTransaction) {
-      const normalizedFromAddress = fromAddress.toLowerCase();
-      const newFromBalance = this.getBalance(normalizedFromAddress);
-      
-      // إرسال تحديث فوري للمرسل (balance deducted instantly)
-      this.instantWalletSync.notifyBalanceUpdate(
-        normalizedFromAddress,
-        newFromBalance,
-        'pending_deduction'  // pending state - not yet confirmed
-      ).catch(() => {});
-      
-      // إرسال تحديث فوري للمستقبل أيضاً
-      if (toAddress && !isContractDeployment) {
-        const normalizedToAddress = toAddress.toLowerCase();
-        const newToBalance = this.getBalance(normalizedToAddress);
-        
-        this.instantWalletSync.notifyBalanceUpdate(
-          normalizedToAddress,
-          newToBalance,
-          'pending_credit'
-        ).catch(() => {});
-      }
     }
 
     // بث المعاملة للشبكة (فقط للمعاملات الخارجية)
@@ -929,9 +928,9 @@ class AccessNetwork extends EventEmitter {
       // ✅ التحقق من صحة البيانات (مع دعم contract deployment and calls)
       // For contract deployment: to can be empty, amount can be 0
       // For contract calls: to = contract address, amount can be 0
-      // For normal transfer: to must exist, amount CAN be 0 (gas-only transfer)
-      if (!isContractDeployment && !isContractCall && !toAddress) {
-        throw new Error('Invalid transaction data: No recipient address');
+      // For normal transfer: to must exist, amount must be > 0
+      if (!isContractDeployment && !isContractCall && (!toAddress || amount <= 0)) {
+        throw new Error('Invalid transaction data');
       }
 
       // ✅ التحقق من تنسيق العناوين (مع دعم contract deployment)
@@ -1112,16 +1111,14 @@ class AccessNetwork extends EventEmitter {
         }
       }
 
-      // ⚠️ DISABLED: Do NOT save monolithic balances.json - causes balance reversions
-      // Balances persist ONLY through individual account files via updateBalanceInStateTrie()
-      // The monolithic saveState() was causing stale data issues when reloaded
-      // if (this.ethereumStorage) {
-      //   const balancesObj = {};
-      //   for (const [addr, bal] of this.balances.entries()) {
-      //     balancesObj[addr] = bal;
-      //   }
-      //   await this.ethereumStorage.saveState({ balances: balancesObj });
-      // }
+      // ✅ حفظ فوري لملف balances.json بالكامل بعد كل معاملة ناجحة
+      if (this.ethereumStorage) {
+        const balancesObj = {};
+        for (const [addr, bal] of this.balances.entries()) {
+          balancesObj[addr] = bal;
+        }
+        await this.ethereumStorage.saveState({ balances: balancesObj });
+      }
 
     } catch (error) {
       console.error('❌ TRANSACTION PROCESSING FAILED:', error);
@@ -1214,8 +1211,7 @@ class AccessNetwork extends EventEmitter {
 
       // حفظ البلوكتشين والحالة بعد تعدين كتلة جديدة
       this.saveChain();
-      // ⚠️ DISABLED: this.saveState() - Individual account files are the only source of truth
-      // this.saveState(); 
+      this.saveState();
       this.saveMempool();
 
       this.emit('blockMined', block);
@@ -1332,12 +1328,23 @@ class AccessNetwork extends EventEmitter {
   }
 
   // حفظ State في التخزين الدائم (async للاستدعاء المستقبلي فقط)
-  // ⚠️ DISABLED: This method is deprecated - use updateBalanceInStateTrie() instead
-  // Individual account files are the only source of truth for balances
   async saveStateToStorage() {
-    // NO-OP: Balances must ONLY persist through individual account files
-    // Never save monolithic state to prevent stale data issues
-    return true;
+    try {
+      const balanceObj = {};
+      for (const [address, balance] of this.balances.entries()) {
+        balanceObj[address] = balance;
+      }
+
+      await this.storage.saveState({
+        balances: balanceObj,
+        lastUpdate: Date.now(),
+        blockHeight: this.chain.length - 1
+      });
+
+      // ✅ Removed verbose logging for performance
+    } catch (error) {
+      console.error('Error saving state to storage:', error);
+    }
   }
 
   // Update balance for an address (for external wallets) - ETHEREUM-STYLE
