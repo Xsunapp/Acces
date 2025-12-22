@@ -392,20 +392,38 @@ class AccessStateStorage {
   async saveAccountCache() {
     const tempFile = `${this.accountCacheFile}.tmp`;
     try {
+      // التأكد من وجود المجلد
+      const dir = path.dirname(this.accountCacheFile);
+      if (!fs.existsSync(dir)) {
+        await fs.promises.mkdir(dir, { recursive: true });
+      }
+
       // كتابة البيانات في ملف مؤقت
-      await fs.promises.writeFile(
-        tempFile,
-        JSON.stringify(this.accountCache, null, 2),
-        'utf8'
-      );
+      const data = JSON.stringify(this.accountCache, null, 2);
+      await fs.promises.writeFile(tempFile, data, 'utf8');
       
-      // ✅ Atomic rename (حماية من corruption في حالة crash)
-      await fs.promises.rename(tempFile, this.accountCacheFile);
+      // ✅ التأكد من وجود الملف المؤقت قبل محاولة التغيير
+      if (fs.existsSync(tempFile)) {
+        // ✅ Atomic rename (حماية من corruption في حالة crash)
+        await fs.promises.rename(tempFile, this.accountCacheFile);
+      } else {
+        throw new Error(`Temp file was not created: ${tempFile}`);
+      }
     } catch (error) {
       console.error('⚠️ Error saving account cache:', error.message);
+      // محاولة الحفظ المباشر كحل أخير إذا فشل الـ rename
+      try {
+        await fs.promises.writeFile(this.accountCacheFile, JSON.stringify(this.accountCache, null, 2), 'utf8');
+        console.log('✅ Fallback: Saved account cache directly');
+      } catch (fallbackError) {
+        console.error('❌ Critical: Persistent storage failure:', fallbackError.message);
+      }
+      
       // تنظيف الملف المؤقت في حالة الفشل
       try {
-        await fs.promises.unlink(tempFile);
+        if (fs.existsSync(tempFile)) {
+          await fs.promises.unlink(tempFile);
+        }
       } catch {}
     }
   }
