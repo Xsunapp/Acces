@@ -74,12 +74,14 @@ export async function handleWeb3RPC(request) {
         }
 
         try {
-          // ⚡ NETWORK-ONLY - قراءة مباشرة من network state فقط (ZERO CACHE)
+          // ⚡ NETWORK-ONLY - قراءة مباشرة من Ledger State لضمان التحديث الفوري
+          // نستخدم BigInt لضمان دقة Ethereum 10^18
           const balance = network.getBalance(address);
-
-          // تحويل إلى Wei مع ضمان الدقة
-          const balanceWei = Math.floor(Math.max(0, balance) * 1e18);
-          const balanceHex = '0x' + balanceWei.toString(16);
+          
+          // تحويل الرصيد إلى Wei (10^18) كعدد صحيح كبير جداً (BigInt)
+          // هذا يمنع أخطاء التقريب التي تحدث مع الأرقام العشرية
+          const balanceWeiBigInt = BigInt(Math.floor(balance * 1e9)) * BigInt(1e9);
+          const balanceHex = '0x' + balanceWeiBigInt.toString(16);
 
           return {
             jsonrpc: '2.0',

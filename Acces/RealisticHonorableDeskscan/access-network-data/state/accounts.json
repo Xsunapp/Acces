@@ -36,8 +36,8 @@
     "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "0xcbabdc87205528b398f492e260d535b403166d67": {
-    "nonce": "6",
-    "balance": "139579999999999950",
+    "nonce": "7",
+    "balance": "137559999999999970",
     "storageRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -49,7 +49,7 @@
   },
   "0x90c423c2a9d3ec691d683fe040e4371d8c0edcda": {
     "nonce": "0",
-    "balance": "30199999999999996",
+    "balance": "32200000000000000",
     "storageRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },

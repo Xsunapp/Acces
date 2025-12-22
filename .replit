@@ -1,4 +1,4 @@
-modules = ["nodejs-18:v5-20240118-46733e4", "postgresql-16"]
+modules = ["nodejs-18", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"

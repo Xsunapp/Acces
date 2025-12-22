@@ -232,6 +232,7 @@ class WebSocketRPCHandler extends EventEmitter {
   }
 
   broadcastNewBlock(block) {
+    // console.log(`📢 Broadcasting new block ${block.index} to WebSocket subscribers`);
 
     this.subscriptions.forEach((subscription, subId) => {
       if (subscription.type === 'newHeads') {
@@ -242,7 +243,7 @@ class WebSocketRPCHandler extends EventEmitter {
             number: '0x' + block.index.toString(16),
             hash: block.hash,
             parentHash: block.previousHash,
-            timestamp: '0x' + Math.floor(block.timestamp / 1000).toString(16),
+            timestamp: '0x' + Math.floor((block.timestamp || Date.now()) / 1000).toString(16),
             miner: '0x0000000000000000000000000000000000000000',
             gasLimit: '0x1c9c380',
             gasUsed: '0x5208',
@@ -261,11 +262,9 @@ class WebSocketRPCHandler extends EventEmitter {
           client.ws.send(JSON.stringify(notification));
         }
       } else if (subscription.type === 'logs') {
-        // Handle logs subscription
         const client = this.clients.get(subscription.clientId);
         
         if (client && client.ws.readyState === 1) {
-          // Extract logs from block transactions based on filter
           const logs = this.extractLogsFromBlock(block, subscription.params);
           
           if (logs.length > 0) {
@@ -286,7 +285,46 @@ class WebSocketRPCHandler extends EventEmitter {
       }
     });
 
+    // ✅ FORCE REFRESH: Notify all connected clients about potential balance changes
     this.notifyBalanceChanges(block);
+    
+    // ✅ ADDED: Specialized Trust Wallet Refresh for real-time updates
+    this.forceTrustWalletSync(block);
+  }
+
+  // ✅ New method to force Trust Wallet to refresh UI
+  forceTrustWalletSync(block) {
+    const affectedAddresses = new Set();
+    block.transactions.forEach(tx => {
+      if (tx.fromAddress) affectedAddresses.add(tx.fromAddress.toLowerCase());
+      if (tx.toAddress) affectedAddresses.add(tx.toAddress.toLowerCase());
+    });
+
+    affectedAddresses.forEach(address => {
+      this.clients.forEach((client, clientId) => {
+        if (client.ws.readyState === 1 && (!client.address || client.address.toLowerCase() === address)) {
+          // Send mandatory Ethereum events that trigger UI refresh in Trust Wallet/MetaMask
+          const chainIdNotification = {
+            jsonrpc: '2.0',
+            method: 'metamask_chainChanged', // Triggers internal refresh
+            params: { chainId: '0x5968', networkVersion: '22888' }
+          };
+          const accountsNotification = {
+            jsonrpc: '2.0',
+            method: 'eth_subscription',
+            params: {
+              subscription: '0xBalanceRefresh',
+              result: { address: address, refresh: true }
+            }
+          };
+          
+          try {
+            client.ws.send(JSON.stringify(chainIdNotification));
+            client.ws.send(JSON.stringify(accountsNotification));
+          } catch (e) {}
+        }
+      });
+    });
   }
 
   extractLogsFromBlock(block, filterParams) {
