@@ -37,7 +37,7 @@
   },
   "0xcbabdc87205528b398f492e260d535b403166d67": {
     "nonce": "7",
-    "balance": "137559999999999970",
+    "balance": "137559999999999980",
     "storageRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -54,8 +54,20 @@
     "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "0x44e434b3f8d638322ed9fc2f24f55ecef8530f88": {
+    "nonce": "2",
+    "balance": "39913936000000010",
+    "storageRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "0x87d6e7bb1836863afafe0ec54c2e7d36d46dddbd": {
     "nonce": "0",
-    "balance": "40000000000000000",
+    "balance": "0",
+    "storageRoot": "b48d38f93eaa084033fc5970bf96e559c33c4cdc07d889ab00b4d63f9590739d",
+    "codeHash": "30a291f5b0aca12e887c20e04dbbe7bd552829e5b0cd8d7dd879703c97b032ed"
+  },
+  "0x43afa5f73d77176a36d82f1f4eacdc716072c33a": {
+    "nonce": "0",
+    "balance": "0",
     "storageRoot": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "codeHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   }
