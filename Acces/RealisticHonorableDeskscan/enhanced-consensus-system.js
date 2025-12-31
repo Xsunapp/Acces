@@ -29,6 +29,7 @@ class EnhancedConsensusSystem extends EventEmitter {
 
     // إضافة خاصية لتتبع آخر وقت إنتاج بلوك
     this.lastBlockTime = Date.now();
+    this.startTime = Date.now(); // وقت بدء التشغيل
   }
 
   async initializeConsensus() {
@@ -434,7 +435,9 @@ class EnhancedConsensusSystem extends EventEmitter {
       }
 
       // التحقق من سرعة إنتاج البلوك
-      if (this.lastBlockTime && (blockTime - this.lastBlockTime) < (this.blockTime * 900)) { // أقل من 90% من الوقت المطلوب
+      // تجاهل أول 10 ثوان بعد بدء التشغيل (التهيئة الأولية)
+      const timeSinceStart = Date.now() - (this.startTime || Date.now());
+      if (this.lastBlockTime && timeSinceStart > 10000 && (blockTime - this.lastBlockTime) < (this.blockTime * 900)) {
         console.warn('⚠️ Block produced too quickly - possible attack');
       }
 

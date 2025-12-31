@@ -9,6 +9,25 @@ class WebSocketRPCHandler extends EventEmitter {
     this.subscriptions = new Map();
     this.subscriptionCounter = 0;
     
+    // ✅ TRUST WALLET FIX: Start heartbeat to prevent socket timeout
+    this.startHeartbeat();
+  }
+  
+  // ✅ TRUST WALLET FIX: Heartbeat system to keep WebSocket connections alive
+  startHeartbeat() {
+    // Send ping every 25 seconds to prevent "socket time has expired"
+    setInterval(() => {
+      this.clients.forEach((client, clientId) => {
+        if (client.ws.readyState === 1) { // WebSocket.OPEN
+          try {
+            client.ws.ping();
+            client.lastPing = Date.now();
+          } catch (e) {
+            // Ignore ping errors
+          }
+        }
+      });
+    }, 25000);
   }
 
   handleNewClient(ws, clientId) {
@@ -17,7 +36,16 @@ class WebSocketRPCHandler extends EventEmitter {
       ws: ws,
       subscriptions: new Set(),
       address: null,
-      connectedAt: Date.now()
+      connectedAt: Date.now(),
+      lastPing: Date.now()
+    });
+    
+    // ✅ TRUST WALLET FIX: Handle pong responses
+    ws.on('pong', () => {
+      const client = this.clients.get(clientId);
+      if (client) {
+        client.lastPong = Date.now();
+      }
     });
 
     ws.on('message', async (message) => {

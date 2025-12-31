@@ -42,6 +42,77 @@ window.formatNumberSmart = function(number) {
   return parts.join('.');
 };
 
+// 🔔 Push Notifications Registration Function
+async function registerPushNotifications(userId) {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn('Push notifications not supported');
+      return;
+    }
+
+    // Get the service worker registration
+    const registration = await navigator.serviceWorker.ready;
+
+    // Check if already subscribed
+    let subscription = await registration.pushManager.getSubscription();
+    
+    // ✅ Force unsubscribe old subscription and create new one to fix 410 errors
+    if (subscription) {
+      try {
+        await subscription.unsubscribe();
+        console.log('🔄 Unsubscribed old push subscription');
+        subscription = null;
+      } catch (e) {
+        console.warn('Could not unsubscribe:', e);
+      }
+    }
+    
+    if (!subscription) {
+      // Subscribe to push notifications with current VAPID key
+      const vapidPublicKey = 'BPRQALkVxvlQs5QS5Iu53dSFiddGJ6Zuhqo7hgQGkoATj_MUnZCdn0KtkIInV1J_9lD6H1UMZH1WHbGRHokXdZA';
+      
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      });
+
+      console.log('✅ Subscribed to push notifications:', subscription.endpoint.substring(0, 50) + '...');
+    }
+
+    // Send subscription to server
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: userId,
+        subscription: subscription
+      })
+    });
+
+    console.log('🔔 Push subscription saved to server');
+  } catch (error) {
+    console.error('❌ Push notification registration failed:', error);
+  }
+}
+
+// Helper function to convert VAPID key
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 // AccessRewards main script
 document.addEventListener('DOMContentLoaded', function() {
   // Initialize variables first
@@ -6558,6 +6629,10 @@ window.addEventListener('load', applyArabicCssIfNeeded);
           // Connect to WebSocket for presence tracking
           connectPresenceWebSocket(currentUser.id);
           
+          // 🔔 SUBSCRIBE TO PUSH NOTIFICATIONS
+          if ('serviceWorker' in navigator && 'PushManager' in window && Notification.permission === 'granted') {
+            registerPushNotifications(currentUser.id);
+          }
           // Load processing history when restoring session
           addProcessingHistoryEntry();
           

@@ -102,9 +102,9 @@ window.translations = {
     "Activity....": "Activity...",
 
     // Referrals
-    inviteEarn: "Invite Friends & Earn",
+    inviteEarn: "Invite Friends & Get Points",
     bonusAmount: "0.15 points",
-    bonusText: "Earn 0.15 points for each friend who joins using your referral code!",
+    bonusText: "Get 0.15 points for each friend who joins using your referral code!",
     yourReferrals: "Your Referrals",
     "Your Referral Code:": "Your Referral Code:",
     "Your Referral Code:": "Your Referral Code:",
@@ -493,9 +493,9 @@ processingTransaction: "Traitement de la transaction en cours...",
     "You received 0.15 points bonus for registering with a referral code!": "Vous avez reçu un bonus de 0,15 points pour vous être inscrit avec un code de parrainage !",
 
     // Referrals
-    inviteEarn: "Invitez vos Amis & Gagnez",
+    inviteEarn: "Invitez vos Amis & Obtenez des Points",
     bonusAmount: "0.15 points",
-    bonusText: "Gagnez 0.15 points pour chaque ami qui rejoint en utilisant votre code de parrainage !",
+    bonusText: "Obtenez 0.15 points pour chaque ami qui rejoint en utilisant votre code de parrainage !",
     yourReferrals: "Vos Parrainages",
     "Your Referral Code:": "Votre Code de Parrainage:",
     "No referrals yet": "Pas encore de parrainages",
@@ -1012,9 +1012,9 @@ processingTransaction: "Procesando transacción...",
     "Activity...": "Actividad...",
 
     // Referrals
-    inviteEarn: "Invita Amigos y Gana",
+    inviteEarn: "Invita Amigos y Obtén Puntos",
     bonusAmount: "0.15 monedas",
-    bonusText: "¡Gana 0.15 puntos por cada amigo que se una usando tu código de referencia!",
+    bonusText: "¡Obtén 0.15 puntos por cada amigo que se una usando tu código de referencia!",
     yourReferrals: "Tus Referencias",
     "Your Referral Code:": "Tu Código de Referencia:",
     "No referrals yet": "Aún no hay referidos",
@@ -1494,9 +1494,9 @@ processingTransaction: "Elaborazione della transazione in corso...",
     "Activity...": "Attività...", 
     
     // Referrals
-    inviteEarn: "Invita amici e guadagna",
+    inviteEarn: "Invita amici e ottieni punti",
     bonusAmount: "0.15 monete",
-    bonusText: "Guadagna 0.15 monete per ogni amico che si unisce usando il tuo codice referral!",
+    bonusText: "Ottieni 0.15 monete per ogni amico che si unisce usando il tuo codice referral!",
     yourReferrals: "I tuoi referral",
     "Your Referral Code:": "Il tuo codice referral:",
     "No referrals yet": "Ancora nessun referral",
@@ -1973,9 +1973,9 @@ processingTransaction: "İşlem işleniyor...",
     "Activity...": "Etkinlik...",
 
     // Referrals
-    inviteEarn: "Arkadaşlarını Davet Et & Kazan",
+    inviteEarn: "Arkadaşlarını Davet Et & Puan Kazan",
     bonusAmount: "0.15 jeton",
-    bonusText: "Davet kodunuzu kullanarak katılan her arkadaşınız için 0.15 jeton kazanın!",
+    bonusText: "Davet kodunuzu kullanarak katılan her arkadaşınız için 0.15 puan kazanın!",
     yourReferrals: "Davetleriniz",
     "Your Referral Code:": "Davet Kodunuz:",
     "No referrals yet": "Henüz davet yok",
@@ -2460,9 +2460,9 @@ processingTransaction: "İşlem işleniyor...",
      "Activity...": "गतिविधि...", 
     
     // Referrals
-    inviteEarn: "दोस्तों को आमंत्रित करें और कमाएं",
+    inviteEarn: "दोस्तों को आमंत्रित करें और पॉइंट्स पाएं",
     bonusAmount: "0.15 सिक्के",
-    bonusText: "आपके रेफरल कोड का उपयोग करके शामिल होने वाले प्रत्येक दोस्त के लिए 0.15 सिक्के कमाएं!",
+    bonusText: "आपके रेफरल कोड का उपयोग करके शामिल होने वाले प्रत्येक दोस्त के लिए 0.15 पॉइंट्स पाएं!",
     yourReferrals: "आपके रेफरल",
     "Your Referral Code:": "आपका रेफरल कोड:",
     "No referrals yet": "अभी तक कोई रेफरल नहीं",
@@ -2946,9 +2946,9 @@ processingTransaction: "İşlem işleniyor...",
      "Activity...": "活动...", 
 
     // Referrals
-    inviteEarn: "邀请好友并赚取",
+    inviteEarn: "邀请好友获取积分",
     bonusAmount: "0.15 个币",
-    bonusText: "每位使用您的推荐码加入的朋友，您可以赚取 0.15 个币！",
+    bonusText: "每位使用您的推荐码加入的朋友，您可以获得 0.15 积分！",
     yourReferrals: "您的推荐",
     "Your Referral Code:": "您的推荐码:",
     "No referrals yet": "暂无推荐",
@@ -3444,9 +3444,9 @@ processingTransaction: "İşlem işleniyor...",
     "Activity...": "活動...",
 
     // Referrals
-    inviteEarn: "友達を招待して獲得",
+    inviteEarn: "友達を招待してポイントを獲得",
     bonusAmount: "0.15コイン",
-    bonusText: "あなたの紹介コードを使って参加した友達0.15人につき1コインを獲得できます！",
+    bonusText: "あなたの紹介コードを使って参加した友達1人につき0.15ポイントを獲得！",
     yourReferrals: "あなたの紹介",
     "Your Referral Code:": "あなたの紹介コード:",
     "No referrals yet": "まだ紹介がありません",
@@ -3926,9 +3926,9 @@ processingTransaction: "İşlem işleniyor...",
 
     
     // Referrals
-    inviteEarn: "친구 초대 및 수익 창출",
+    inviteEarn: "친구 초대하고 포인트 받기",
     bonusAmount: "0.15코인",
-    bonusText: "귀하의 추천 코드를 사용하여 가입하는 친구마다 0.15코인을 획득하세요!",
+    bonusText: "귀하의 추천 코드를 사용하여 가입하는 친구마다 0.15포인트를 획득하세요!",
     yourReferrals: "귀하의 추천",
     "Your Referral Code:": "귀하의 추천 코드:",
     "Referral Benefits": "추천 혜택",
@@ -4418,9 +4418,9 @@ processingTransaction: "İşlem işleniyor...",
     "Activity...": "Atividade...",
 
     // Referrals
-    inviteEarn: "Convide Amigos e Ganhe",
+    inviteEarn: "Convide Amigos e Ganhe Pontos",
     bonusAmount: "0.15 moedas",
-    bonusText: "Ganhe 0.15 moedas para cada amigo que se juntar usando seu código de indicação!",
+    bonusText: "Ganhe 0.15 pontos para cada amigo que se juntar usando seu código de indicação!",
     yourReferrals: "Suas Indicações",
     "Your Referral Code:": "Seu Código de Indicação:",
     "Referral Benefits": "Benefícios de Indicação",
@@ -4906,9 +4906,9 @@ insufficientBalance: "Недостаточно средств для этой т
 
   
     // Referrals
-    inviteEarn: "Приглашайте друзей и зарабатывайте",
+    inviteEarn: "Приглашайте друзей и получайте баллы",
     bonusAmount: "0.15 монет",
-    bonusText: "Зарабатывайте 0.15 баллов за каждого друга, который присоединится, используя ваш реферальный код!",
+    bonusText: "Получайте 0.15 баллов за каждого друга, который присоединится, используя ваш реферальный код!",
     yourReferrals: "Ваши рефералы",
     "Your Referral Code:": "Ваш реферальный код:",
     "No referrals yet": "Пока нет рефералов",
@@ -5413,9 +5413,9 @@ insufficientBalance: "Недостаточно средств для этой т
     "Activity...": "Aktivität...",
     
     // Referrals
-    inviteEarn: "Freunde einladen & verdienen",
+    inviteEarn: "Freunde einladen & Punkte erhalten",
     bonusAmount: "0.15 Punkte",
-    bonusText: "Verdienen Sie 0.15 Punkte für jeden Freund, der sich mit Ihrem Empfehlungscode anmeldet!",
+    bonusText: "Erhalten Sie 0.15 Punkte für jeden Freund, der sich mit Ihrem Empfehlungscode anmeldet!",
     yourReferrals: "Ihre Empfehlungen",
     "Your Referral Code:": "Ihr Empfehlungscode:",
     "No referrals yet": "Noch keine Empfehlungen",
@@ -5975,9 +5975,9 @@ insufficientBalance: "Недостаточно средств для этой т
      
     
     // Referrals
-    inviteEarn: "ادعُ الأصدقاء واكسب",
+    inviteEarn: "ادعُ الأصدقاء واحصل على نقاط",
     bonusAmount: "0.15 نقاط",
-    bonusText: "اكسب 0.15 نقاط لكل صديق ينضم باستخدام رمز الإحالة الخاص بك!",
+    bonusText: "احصل على 0.15 نقاط لكل صديق ينضم باستخدام رمز الإحالة الخاص بك!",
     yourReferrals: "إحالاتك",
     "Share Options": "خيارات المشاركة",
     "Copy Referral Code": "نسخ رمز الإحالة",
@@ -6453,9 +6453,9 @@ insufficientBalance: "Недостаточно средств для этой т
     "Activity...": "Aktivitas...",
 
     // Referrals
-    inviteEarn: "Undang Teman & Dapatkan",
+    inviteEarn: "Undang Teman & Dapatkan Poin",
     bonusAmount: "0.15 koin",
-    bonusText: "Dapatkan 0.15 koin untuk setiap teman yang bergabung menggunakan kode referral Anda!",
+    bonusText: "Dapatkan 0.15 poin untuk setiap teman yang bergabung menggunakan kode referral Anda!",
     yourReferrals: "Referral Anda",
     "Your Referral Code:": "Kode Referral Anda:",
     "No referrals yet": "Belum ada referral",
@@ -6963,9 +6963,9 @@ insufficientBalance: "Недостаточно средств для этой т
 
     
     // Referrals
-    inviteEarn: "Zaproś znajomych i zarabiaj",
+    inviteEarn: "Zaproś znajomych i zdobywaj punkty",
     bonusAmount: "0.15 monet",
-    bonusText: "Zarabiaj 0.15 monet za każdego znajomego, który dołączy używając Twojego kodu polecającego!",
+    bonusText: "Zdobywaj 0.15 punktów za każdego znajomego, który dołączy używając Twojego kodu polecającego!",
     yourReferrals: "Twoje polecenia",
     "Your Referral Code:": "Twój kod polecający:",
     "No referrals yet": "Brak poleceń",

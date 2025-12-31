@@ -12,14 +12,14 @@
     "decimals": 18
   },
   "rpc": [
-    "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000"
+    "https://glowing-space-cod-v665jpxrr4grc6p4p-5000.app.github.dev/"
   ],
   "faucets": [],
-  "infoURL": "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev",
+  "infoURL": "https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev",
   "explorers": [
     {
       "name": "Access Network Explorer",
-      "url": "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-explorer.html",
+      "url": "https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-explorer.html",
       "standard": "EIP3091",
       "icon": "access"
     }

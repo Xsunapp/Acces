@@ -4,10 +4,10 @@
   "chainId": "0x5968",
   "networkId": "22888",
   "rpcUrls": [
-    "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000"
+    "https://glowing-space-cod-v665jpxrr4grc6p4p-5000.app.github.dev/"
   ],
   "blockExplorerUrls": [
-    "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-explorer.html#`"
+    "https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-explorer.html#`"
   ],
   "nativeCurrency": {
     "name": "Access Coin",
@@ -15,7 +15,7 @@
     "decimals": 18
   },
   "iconUrls": [
-    "https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/logo.png"
+    "https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/logo.png"
   ],
   "description": "Access Network - Decentralized Digital Currency Platform",
   "features": {

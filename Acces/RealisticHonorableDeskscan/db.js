@@ -873,6 +873,21 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_external_wallets_activity ON external_wallets(last_activity DESC);
     `);
 
+    // Create push_subscriptions table for web push notifications
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255),
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        revoked_at TIMESTAMP NULL
+      )
+    `);
+
     console.log('PostgreSQL database initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);

@@ -7,6 +7,7 @@ import { DistributedNetworkSystem } from './distributed-network-system.js';
 import { ParallelProcessingEngine } from './parallel-processing-engine.js';
 import { AdvancedSecuritySystem } from './advanced-security-system.js';
 import { getGlobalAccessStateStorage } from './access-state-storage.js';
+import { transactionRecovery } from './transaction-recovery-system.js';
 
 // فئة الكتلة (Block)
 class Block {
@@ -362,11 +363,13 @@ class AccessNetwork extends EventEmitter {
     try {
       // ✅ تحديث this.balances من accessStateStorage قبل الحفظ
       if (this.accessStateStorage) {
-        const accountsCache = this.accessStateStorage.accountsCache;
-        if (accountsCache && accountsCache.size > 0) {
-          for (const [address, account] of accountsCache.entries()) {
-            const balance = parseFloat(account.balance) / 1e18;
-            this.balances.set(address.toLowerCase(), balance);
+        const accountCache = this.accessStateStorage.accountCache; // ✅ Fixed typo: accountCache not accountsCache
+        if (accountCache && Object.keys(accountCache).length > 0) {
+          for (const [address, account] of Object.entries(accountCache)) {
+            if (account && account.balance) {
+              const balance = parseInt(account.balance) / 1e18;
+              this.balances.set(address.toLowerCase(), balance);
+            }
           }
         }
       }
@@ -382,8 +385,40 @@ class AccessNetwork extends EventEmitter {
       };
 
       await this.ethereumStorage.saveState(stateData);
+      
+      // ✅ أيضاً: مزامنة this.balances إلى accounts.json للتخزين الموحد
+      await this.syncBalancesToAccountCache();
     } catch (error) {
       console.error('❌ Error saving state:', error);
+    }
+  }
+  
+  // ✅ مزامنة الأرصدة من this.balances إلى accounts.json
+  // ⚠️ هام: لا تُستدعى تلقائياً - فقط عند طلب صريح
+  async syncBalancesToAccountCache() {
+    try {
+      if (!this.accessStateStorage) return;
+      
+      for (const [address, balance] of this.balances.entries()) {
+        const balanceInWei = Math.floor(balance * 1e18);
+        // ✅ تحديث حتى لو كان الرصيد صفر (لمنع أرصدة قديمة خاطئة)
+        const normalizedAddress = address.toLowerCase();
+        if (!this.accessStateStorage.accountCache[normalizedAddress]) {
+          this.accessStateStorage.accountCache[normalizedAddress] = {
+            nonce: "0",
+            balance: balanceInWei.toString(),
+            storageRoot: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            codeHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          };
+        } else {
+          this.accessStateStorage.accountCache[normalizedAddress].balance = balanceInWei.toString();
+        }
+      }
+      
+      // حفظ accounts.json
+      await this.accessStateStorage.saveAccountCache();
+    } catch (error) {
+      console.error('⚠️ Error syncing balances to account cache:', error.message);
     }
   }
 
@@ -502,6 +537,31 @@ class AccessNetwork extends EventEmitter {
   // 🚀 تهيئة الأنظمة المتطورة التي تفوق BSC
   async initializeAdvancedSystems() {
     try {
+      // 0. 🛡️ نظام استرداد المعاملات (Atomicity Protection)
+      await transactionRecovery.initialize();
+      
+      // استرداد المعاملات المعلقة من الإغلاق السابق
+      const recoveryResult = await transactionRecovery.recoverPendingTransactions(
+        this,
+        async (tx) => {
+          // إعادة تنفيذ المعاملة
+          const transaction = new Transaction(
+            tx.from,
+            tx.to,
+            tx.amount,
+            tx.gasFee,
+            tx.timestamp
+          );
+          transaction.hash = tx.hash;
+          transaction.nonce = tx.nonce;
+          await this.processTransactionImmediately(transaction);
+        }
+      );
+      
+      if (recoveryResult.recovered > 0 || recoveryResult.cancelled > 0) {
+        console.log(`🛡️ Transaction Recovery: ${recoveryResult.recovered} recovered, ${recoveryResult.cancelled} cancelled`);
+      }
+
       // 1. نظام الإجماع المتطور
       this.enhancedConsensus = new EnhancedConsensusSystem(this);
 
@@ -665,15 +725,45 @@ class AccessNetwork extends EventEmitter {
                                transaction.isMigration === true ||
                                transaction.isGenesis === true;
 
+    // Validate addresses for non-system transactions
+    if (!isSystemTransaction && fromAddress) {
+      // Check address format
+      if (typeof fromAddress !== 'string' || !fromAddress.match(/^0x[a-f0-9]{40}$/i)) {
+        throw new Error(`❌ Invalid sender address format: ${fromAddress}`);
+      }
+    }
+    
+    if (!isContractDeployment && toAddress && typeof toAddress === 'string') {
+      // Check toAddress format (skip for contract deployment where toAddress might be empty)
+      if (toAddress !== '' && toAddress !== '0x' && !toAddress.match(/^0x[a-f0-9]{40}$/i)) {
+        throw new Error(`❌ Invalid recipient address format: ${toAddress}`);
+      }
+    }
+
     // ✅ SECURITY FIX: Reserve gas fee even for contract deployment (gas must be paid!)
     // Only skip reservation for system transactions
     if (fromAddress && fromAddress !== null && !isSystemTransaction) {
       const normalizedFromAddress = fromAddress.toLowerCase();
-      const totalRequired = amount + gasFee;
+      const gasFeeAmount = parseFloat(gasFee || this.gasPrice) || 0;
+      const amountToSend = parseFloat(amount) || 0;
+      const totalRequired = amountToSend + gasFeeAmount;
+
+      // Validate numeric values
+      if (isNaN(totalRequired) || totalRequired < 0 || !isFinite(totalRequired)) {
+        throw new Error(`❌ Invalid transaction amounts: amount=${amountToSend}, fee=${gasFeeAmount}`);
+      }
 
       // 🔒 IMMEDIATE BALANCE RESERVATION - يحجز الرصيد فوراً
       const currentBalance = this.getBalance(normalizedFromAddress);
+      if (!isFinite(currentBalance) || currentBalance < 0) {
+        throw new Error(`❌ Invalid account balance: ${currentBalance}`);
+      }
+      
       const reservedAmount = this.reservedBalances.get(normalizedFromAddress) || 0;
+      if (!isFinite(reservedAmount) || reservedAmount < 0) {
+        throw new Error(`❌ Invalid reserved amount: ${reservedAmount}`);
+      }
+      
       const availableBalance = currentBalance - reservedAmount;
 
       // رفض فوري إذا كان الرصيد المتاح غير كافي
@@ -751,9 +841,20 @@ class AccessNetwork extends EventEmitter {
 
     if (!isSystemTransaction) {
       // STRICT BALANCE VALIDATION - MANDATORY FOR NON-SYSTEM TRANSACTIONS
-      const gasFee = parseFloat(transaction.gasFee || this.gasPrice);
+      const gasFee = parseFloat(transaction.gasFee || this.gasPrice) || 0;
+      if (isNaN(gasFee) || gasFee < 0) {
+        throw new Error('Invalid gas fee value');
+      }
+      
       const totalRequired = numericAmount + gasFee;
+      if (isNaN(totalRequired) || totalRequired < 0) {
+        throw new Error('Invalid transaction total (amount + fee)');
+      }
+      
       const senderBalance = this.getBalance(transaction.fromAddress);
+      if (typeof senderBalance !== 'number' || isNaN(senderBalance) || senderBalance < 0) {
+        throw new Error('Invalid sender balance');
+      }
 
       // REJECT TRANSACTION IF INSUFFICIENT BALANCE
       if (senderBalance < totalRequired) {
@@ -804,7 +905,14 @@ class AccessNetwork extends EventEmitter {
 
 
     // معالجة الأرصدة فوراً عند الإضافة - مرة واحدة فقط
-    await this.processTransactionImmediately(transaction);
+    // ✅ CRITICAL: تخطي معالجة الأرصدة إذا تمت معالجتها مسبقاً (من server.js)
+    if (transaction.skipBalanceProcessing || transaction.balanceUpdated) {
+      console.log(`⏭️ Skipping balance processing for ${txId.slice(0, 16)} (already processed)`);
+    } else {
+      // ⚡ INSTANT: تحديث الأرصدة فوراً بدون await
+      this.updateBalancesSyncWithPersistence(transaction);
+      console.log(`✅ Transaction ${txId.slice(0, 16)} balances updated instantly`);
+    }
 
     // إضافة إلى mempool
     this.mempool.set(txId, transaction);
@@ -860,6 +968,7 @@ class AccessNetwork extends EventEmitter {
       }
     }
 
+    console.log(`🎉 addTransaction COMPLETED - returning txId: ${txId.slice(0, 16)}...`);
     return txId;
   }
 
@@ -909,6 +1018,107 @@ class AccessNetwork extends EventEmitter {
     return;
   }
 
+  // ⚡ FIXED: تحديث الأرصدة بشكل متزامن مع الحفظ الفوري
+  updateBalancesSyncWithPersistence(transaction) {
+    try {
+      const fromAddress = transaction.fromAddress;
+      const toAddress = transaction.toAddress;
+      const amount = parseFloat(transaction.amount) || 0;
+      const gasFee = parseFloat(transaction.gasFee || this.gasPrice) || 0;
+      
+      const isSystemTransaction = fromAddress === null ||
+                                  fromAddress === '0x0000000000000000000000000000000000000000' ||
+                                  transaction.isMigration === true ||
+                                  transaction.isGenesis === true;
+      
+      // 1. خصم من المرسل (إذا لم تكن معاملة نظام)
+      if (fromAddress && !isSystemTransaction) {
+        const normalizedFrom = fromAddress.toLowerCase();
+        const currentBalance = this.getBalance(normalizedFrom);
+        const totalRequired = amount + gasFee;
+        
+        if (currentBalance >= totalRequired) {
+          const newBalance = Math.max(0, currentBalance - totalRequired);
+          this.balances.set(normalizedFrom, newBalance);
+          
+          console.log(`💰 [SENDER DEDUCTED] ${normalizedFrom}: ${currentBalance.toFixed(8)} - ${totalRequired.toFixed(8)} = ${newBalance.toFixed(8)} ACCESS`);
+          
+          // ✅ حفظ في accountCache
+          if (this.accessStateStorage && this.accessStateStorage.accountCache) {
+            const balanceInWei = Math.floor(newBalance * 1e18).toString();
+            this.accessStateStorage.accountCache[normalizedFrom] = {
+              balance: balanceInWei,
+              nonce: (transaction.nonce || 0) + 1
+            };
+            this.accessStateStorage.saveAccountCache().catch(() => {});
+          }
+          
+          // ✅ حفظ في ethereumStorage
+          if (this.ethereumStorage) {
+            this.ethereumStorage.saveAccountState(normalizedFrom, { balance: newBalance, nonce: 0 }).catch(() => {});
+          }
+          
+          // إشعار بالتغيير
+          this.emit('balanceChanged', {
+            address: normalizedFrom,
+            oldBalance: currentBalance,
+            newBalance: newBalance,
+            change: -totalRequired,
+            reason: 'sent'
+          });
+        }
+      }
+      
+      // 2. إضافة للمستقبل
+      if (toAddress && amount > 0) {
+        const normalizedTo = toAddress.toLowerCase();
+        const currentBalance = this.getBalance(normalizedTo);
+        const newBalance = currentBalance + amount;
+        this.balances.set(normalizedTo, newBalance);
+        
+        console.log(`💰 [RECIPIENT CREDITED] ${normalizedTo}: ${currentBalance.toFixed(8)} + ${amount.toFixed(8)} = ${newBalance.toFixed(8)} ACCESS`);
+        
+        // ✅ حفظ في accountCache
+        if (this.accessStateStorage && this.accessStateStorage.accountCache) {
+          const balanceInWei = Math.floor(newBalance * 1e18).toString();
+          this.accessStateStorage.accountCache[normalizedTo] = {
+            balance: balanceInWei,
+            nonce: 0
+          };
+          this.accessStateStorage.saveAccountCache().catch(() => {});
+        }
+        
+        // ✅ حفظ في ethereumStorage
+        if (this.ethereumStorage) {
+          this.ethereumStorage.saveAccountState(normalizedTo, { balance: newBalance, nonce: 0 }).catch(() => {});
+        }
+        
+        // إشعار بالتغيير
+        this.emit('balanceChanged', {
+          address: normalizedTo,
+          oldBalance: currentBalance,
+          newBalance: newBalance,
+          change: amount,
+          reason: 'received'
+        });
+      }
+      
+      // ✅ حفظ جميع الأرصدة
+      if (this.ethereumStorage) {
+        const balancesObj = {};
+        for (const [addr, bal] of this.balances.entries()) {
+          balancesObj[addr] = bal;
+        }
+        this.ethereumStorage.saveState({ balances: balancesObj }).catch(() => {});
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ updateBalancesSyncWithPersistence error:', error.message);
+      return false;
+    }
+  }
+
   // معالجة المعاملة فوراً عند الإضافة - مرة واحدة فقط مع ضمان وصول الرصيد
   async processTransactionImmediately(transaction) {
     try {
@@ -917,6 +1127,21 @@ class AccessNetwork extends EventEmitter {
       const amount = parseFloat(transaction.amount);
       const gasFee = parseFloat(transaction.gasFee || this.gasPrice);
       const txId = transaction.txId || transaction.hash;
+
+      // 🛡️ ATOMICITY: تسجيل المعاملة كـ "pending" قبل أي تغيير في الأرصدة
+      const originalSenderBalance = fromAddress ? this.getBalance(fromAddress) : 0;
+      const originalRecipientBalance = toAddress ? this.getBalance(toAddress) : 0;
+      
+      await transactionRecovery.registerPendingTransaction({
+        hash: txId,
+        from: fromAddress,
+        to: toAddress,
+        amount,
+        gasFee,
+        nonce: transaction.nonce,
+        originalSenderBalance,
+        originalRecipientBalance
+      });
 
       // ✅ CONTRACT: Check if this is contract deployment or contract call
       // SECURITY: Must have BOTH empty 'to' AND non-empty inputData/data for deployment
@@ -930,15 +1155,18 @@ class AccessNetwork extends EventEmitter {
       // For contract calls: to = contract address, amount can be 0
       // For normal transfer: to must exist, amount must be > 0
       if (!isContractDeployment && !isContractCall && (!toAddress || amount <= 0)) {
+        await transactionRecovery.cancelTransaction(txId, this);
         throw new Error('Invalid transaction data');
       }
 
       // ✅ التحقق من تنسيق العناوين (مع دعم contract deployment)
       if (fromAddress && !fromAddress.match(/^0x[a-f0-9]{40}$/i)) {
+        await transactionRecovery.cancelTransaction(txId, this);
         throw new Error('Invalid from address format');
       }
       // For normal transfers, check to address
       if (!isContractDeployment && toAddress && !toAddress.match(/^0x[a-f0-9]{40}$/i)) {
+        await transactionRecovery.cancelTransaction(txId, this);
         throw new Error('Invalid to address format');
       }
 
@@ -964,11 +1192,29 @@ class AccessNetwork extends EventEmitter {
         // ⚡ خصم الرصيد من المرسل - تحديث فوري + persistent
         const newFromBalance = Math.max(0, currentFromBalance - totalRequired);
         this.balances.set(normalizedFromAddress, newFromBalance); // instant in-memory update
-        await this.updateBalanceInStateTrie(normalizedFromAddress, newFromBalance); // persistent State Trie
+        
+        // ✅ تحديث accountCache للمرسل أيضاً (persistence!)
+        if (this.accessStateStorage && this.accessStateStorage.accountCache) {
+          const balanceInWei = Math.floor(newFromBalance * 1e18).toString();
+          if (!this.accessStateStorage.accountCache[normalizedFromAddress]) {
+            this.accessStateStorage.accountCache[normalizedFromAddress] = { nonce: "0", balance: balanceInWei };
+          } else {
+            this.accessStateStorage.accountCache[normalizedFromAddress].balance = balanceInWei;
+          }
+          // ⚡ Non-blocking save - لا تنتظر لتجنب التعليق
+          this.accessStateStorage.saveAccountCache().catch(e => 
+            console.warn('⚠️ Failed to save sender account cache:', e.message)
+          );
+        }
+        
+        // محاولة تحديث State Trie (قد يفشل) - non-blocking
+        this.updateBalanceInStateTrie(normalizedFromAddress, newFromBalance).catch(trieError => 
+          console.warn(`⚠️ State Trie update failed for sender (using in-memory): ${trieError.message}`)
+        );
 
-        // ✅ حفظ فوري في ملفات Ethereum
+        // ✅ حفظ فوري في ملفات Ethereum - non-blocking
         if (this.ethereumStorage) {
-          await this.ethereumStorage.saveAccountState(normalizedFromAddress, { balance: newFromBalance, nonce: 0 });
+          this.ethereumStorage.saveAccountState(normalizedFromAddress, { balance: newFromBalance, nonce: 0 }).catch(() => {});
         }
 
         // 🔔 Emit balance change event for WebSocket notifications
@@ -1034,13 +1280,34 @@ class AccessNetwork extends EventEmitter {
         const currentToBalance = this.getBalance(normalizedToAddress);
         const newToBalance = currentToBalance + amount;
 
-        // ⚡ تحديث رصيد المستقبل فوراً في network state + State Trie
-        this.balances.set(normalizedToAddress, newToBalance); // instant in-memory update
-        await this.updateBalanceInStateTrie(normalizedToAddress, newToBalance); // persistent State Trie
+        console.log(`💰 [BALANCE UPDATE] Recipient ${normalizedToAddress}: ${currentToBalance.toFixed(8)} + ${amount.toFixed(8)} = ${newToBalance.toFixed(8)} ACCESS`);
 
-        // ✅ حفظ فوري في ملفات Ethereum
+        // ⚡ تحديث رصيد المستقبل فوراً في network state
+        this.balances.set(normalizedToAddress, newToBalance); // instant in-memory update
+        
+        // ✅ تحديث accountCache أيضاً للـ persistence (تجنب State Trie المعطل)
+        if (this.accessStateStorage && this.accessStateStorage.accountCache) {
+          const balanceInWei = Math.floor(newToBalance * 1e18).toString();
+          this.accessStateStorage.accountCache[normalizedToAddress] = {
+            balance: balanceInWei,
+            nonce: 0
+          };
+          // ⚡ Non-blocking save - لا تنتظر لتجنب التعليق
+          this.accessStateStorage.saveAccountCache().catch(e => 
+            console.warn('⚠️ Failed to save account cache:', e.message)
+          );
+        }
+        
+        // ⚡ Non-blocking State Trie update
+        this.updateBalanceInStateTrie(normalizedToAddress, newToBalance).catch(trieError => 
+          console.warn(`⚠️ State Trie update failed (using in-memory): ${trieError.message}`)
+        );
+
+        console.log(`✅ [BALANCE SAVED] Recipient ${normalizedToAddress} now has ${newToBalance.toFixed(8)} ACCESS`);
+
+        // ⚡ Non-blocking Ethereum storage save
         if (this.ethereumStorage) {
-          await this.ethereumStorage.saveAccountState(normalizedToAddress, { balance: newToBalance, nonce: 0 });
+          this.ethereumStorage.saveAccountState(normalizedToAddress, { balance: newToBalance, nonce: 0 }).catch(() => {});
         }
 
         // 🔔 Emit balance change event for WebSocket notifications
@@ -1120,12 +1387,18 @@ class AccessNetwork extends EventEmitter {
         await this.ethereumStorage.saveState({ balances: balancesObj });
       }
 
+      // 🛡️ ATOMICITY: تأكيد اكتمال المعاملة بنجاح
+      await transactionRecovery.confirmTransaction(txId);
+
     } catch (error) {
       console.error('❌ TRANSACTION PROCESSING FAILED:', error);
 
+      // 🛡️ ATOMICITY: إلغاء المعاملة واسترداد الرصيد
+      const txId = transaction.txId || transaction.hash;
+      await transactionRecovery.cancelTransaction(txId, this);
+
       // في حالة الفشل، تحرير أي حجوزات
       const fromAddress = transaction.fromAddress;
-      const txId = transaction.txId || transaction.hash;
       const isSystemTransaction = fromAddress === null ||
                                  fromAddress === '0x0000000000000000000000000000000000000000' ||
                                  transaction.isMigration === true ||
@@ -1276,19 +1549,21 @@ class AccessNetwork extends EventEmitter {
     const normalizedAddress = address.toLowerCase();
 
     try {
-      // Priority 1: Read from State Trie accountCache (persistent source of truth)
-      const accountCache = this.accessStateStorage.accountCache || {};
+      // ✅ Priority 1: Read from in-memory balances Map (instant and always up-to-date)
+      const cachedBalance = this.balances.get(normalizedAddress);
+      if (cachedBalance !== undefined) {
+        return cachedBalance;
+      }
+
+      // Priority 2: Fallback to State Trie accountCache (persistent)
+      const accountCache = this.accessStateStorage?.accountCache || {};
       const account = accountCache[normalizedAddress];
       if (account && account.balance) {
         // Convert from Wei to ACCESS (18 decimals)
         const balanceInAccess = parseInt(account.balance) / 1e18;
+        // Also cache in memory for future reads
+        this.balances.set(normalizedAddress, balanceInAccess);
         return balanceInAccess;
-      }
-
-      // Priority 2: Fallback to in-memory cache (for instant updates before State Trie flush)
-      const cachedBalance = this.balances.get(normalizedAddress);
-      if (cachedBalance !== undefined) {
-        return cachedBalance;
       }
 
       // Default: 0 if not found
@@ -1315,11 +1590,51 @@ class AccessNetwork extends EventEmitter {
   // تحميل State من التخزين الدائم (لازم للتهيئة فقط)
   async loadStateFromStorage() {
     try {
-      const savedState = await this.storage.loadState();
-      if (savedState && savedState.size > 0) {
-        this.balances = savedState;
-        // ✅ Removed verbose logging for performance
+      // ✅ انتظار تهيئة accessStateStorage
+      if (this.accessStateStorage && !this.accessStateStorage.isInitialized) {
+        await this.accessStateStorage.initialize();
       }
+      
+      // ✅ أولاً: تحميل من accessStateStorage.accountCache (accounts.json) - المصدر الرئيسي
+      if (this.accessStateStorage && this.accessStateStorage.accountCache) {
+        const accountCache = this.accessStateStorage.accountCache;
+        let loadedCount = 0;
+        
+        for (const [address, account] of Object.entries(accountCache)) {
+          if (account && account.balance) {
+            // تحويل من Wei إلى ACCESS
+            const balanceInAccess = parseInt(account.balance) / 1e18;
+            if (balanceInAccess > 0) {
+              this.balances.set(address.toLowerCase(), balanceInAccess);
+              loadedCount++;
+            }
+          }
+        }
+        
+        if (loadedCount > 0) {
+          console.log(`✅ تم تحميل ${loadedCount} رصيد من accounts.json`);
+        }
+      }
+      
+      // ثانياً: دمج مع balances.json (fallback) - تحميل جميع الأرصدة منه
+      const savedState = await this.storage.loadState();
+      if (savedState) {
+        // تحويل إلى Map إذا كان object
+        const balancesMap = savedState instanceof Map ? savedState : 
+          (savedState.balances ? new Map(Object.entries(savedState.balances)) : new Map());
+        
+        for (const [address, balance] of balancesMap.entries()) {
+          const normalizedAddr = address.toLowerCase();
+          // دمج: استخدم الرصيد الأعلى بين المصدرين
+          const existingBalance = this.balances.get(normalizedAddr) || 0;
+          if (balance > existingBalance) {
+            this.balances.set(normalizedAddr, balance);
+          }
+        }
+        
+        console.log(`✅ تم تحميل أرصدة إضافية من balances.json، إجمالي: ${this.balances.size} محفظة`);
+      }
+      
       this.stateLoaded = true;
     } catch (error) {
       console.error('Error loading state from storage:', error);
@@ -1846,7 +2161,7 @@ class AccessNetwork extends EventEmitter {
         symbol: 'ACCESS',
         decimals: 18
       },
-      rpcUrls: [`https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000`],
+      rpcUrls: [`https://glowing-space-cod-v665jpxrr4grc6p4p-5000.app.github.dev/`],
 
       // ميزات فريدة
       features: {

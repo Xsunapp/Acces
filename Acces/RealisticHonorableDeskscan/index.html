@@ -32,13 +32,13 @@
   <!-- Open Graph Meta Tags for Social Media Sharing -->
   <meta property="og:title" content="AccessDigital - Digital Engagement & Daily Rewards">
   <meta property="og:description" content="Join thousands of users collecting points daily through digital activities, social engagement, and daily check-ins. Build your digital rewards portfolio!">
-  <meta property="og:image" content="https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-logo-1ipfs.png">
-  <meta property="og:image:secure_url" content="https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-logo-1ipfs.png">
+  <meta property="og:image" content="https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-logo-1ipfs.png">
+  <meta property="og:image:secure_url" content="https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-logo-1ipfs.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="AccessDigital - Digital Engagement Platform">
-  <meta property="og:url" content="https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev">
+  <meta property="og:url" content="https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AccessDigital">
   <meta property="og:locale" content="en_US">
@@ -47,7 +47,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="AccessDigital - Digital Engagement & Daily Rewards">
   <meta name="twitter:description" content="Join thousands of users collecting points daily through digital activities, social engagement, and daily check-ins. Build your digital rewards portfolio!">
-  <meta name="twitter:image" content="https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-logo-1ipfs.png">
+  <meta name="twitter:image" content="https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-logo-1ipfs.png">
   <meta name="twitter:image:alt" content="AccessDigital - Digital Engagement Platform">
 
   <!-- Additional Meta Tags -->
@@ -56,7 +56,7 @@
   <meta name="author" content="AccessDigital">
 
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev">
+  <link rel="canonical" href="https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev">
   <link href="style.css" rel="stylesheet" type="text/css" />
   <link rel="stylesheet" href="style-dashboard.css">
    <link rel="stylesheet" href="profile-style.css">
@@ -1324,7 +1324,7 @@ document.addEventListener('balanceUpdated', function(event) {
         <div class="referrals-container">
           <div class="referral-card">
             <div class="referral-header">
-              <h3 data-translate="inviteEarn">Invite Friends & Earn</h3>
+              <h3 data-translate="inviteEarn">Invite Friends & Get Points</h3>
             </div>
 
             <div class="referral-bonus-info">
@@ -1334,7 +1334,7 @@ document.addEventListener('balanceUpdated', function(event) {
                 <span class="bonus-value">0</span>
                 <img src="image__2_-removebg-preview.png" alt="Referral Logo" class="referral-bonus-logo">
               </div>
-              <div class="bonus-text" data-translate="bonusText">Earn 1 coins for each friend who joins using your referral code!</div>
+              <div class="bonus-text" data-translate="bonusText">Get 0.15 points for each friend who joins using your referral code!</div>
             </div>
 
             <div class="referral-share">
@@ -2489,7 +2489,19 @@ Access-Network is a digital rewards platform combining innovation, community fea
               if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission().then((permission) => {
                   console.log('Notification permission:', permission);
+                  
+                  // If permission granted, try to register for push notifications
+                  if (permission === 'granted' && window.currentUser && window.currentUser.id) {
+                    if (typeof registerPushNotifications === 'function') {
+                      registerPushNotifications(window.currentUser.id);
+                    }
+                  }
                 });
+              } else if ('Notification' in window && Notification.permission === 'granted') {
+                // Permission already granted, register immediately
+                if (window.currentUser && window.currentUser.id && typeof registerPushNotifications === 'function') {
+                  registerPushNotifications(window.currentUser.id);
+                }
               }
             })
             .catch((error) => {

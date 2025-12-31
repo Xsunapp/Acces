@@ -11,6 +11,9 @@ import WebSocketRPCHandler from './websocket-rpc-handler.js';
 import { getGlobalAccessStateStorage } from './access-state-storage.js';
 import webpush from 'web-push';
 
+// 🏗️ Enterprise Distributed Infrastructure - للتوسع لملايين المستخدمين
+import enterpriseInfra from './enterprise-infrastructure.js';
+
 // Configure web-push with VAPID keys
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -34,10 +37,29 @@ const __dirname = dirname(__filename);
 // Initialize the database with improved error handling
 let explorerAPI = null; // Will be initialized after network is ready
 
+// 🏗️ تهيئة البنية التحتية الموزعة للتوسع
+let enterpriseInfrastructure = null;
+
 initializeDatabase()
   .then(() => {
     // Initialize earning countdown tables after main database is ready
     return initializeActivityCountdownTables();
+  })
+  .then(async () => {
+    // 🏗️ تهيئة البنية التحتية للملايين
+    try {
+      enterpriseInfrastructure = await enterpriseInfra.initialize({
+        shardCount: 16,              // 16 shard للمعاملات
+        maxTxPerBlock: 1000,         // 1000 معاملة/بلوك
+        blockInterval: 3000,         // بلوك كل 3 ثوان
+        rateLimitMax: 200,           // 200 طلب/دقيقة
+        cacheMaxSize: 50000,         // 50 ألف عنصر cache
+        maxMemory: 300 * 1024 * 1024 // 300MB حد الذاكرة
+      });
+      console.log('✅ Enterprise Infrastructure initialized for millions of users');
+    } catch (err) {
+      console.warn('⚠️ Enterprise Infrastructure not initialized:', err.message);
+    }
   })
   .catch(err => {
     console.error('Critical Error initializing database:', err);
@@ -155,77 +177,7 @@ let wss = null;
 let wsRPCHandler = null; // WebSocket RPC Handler for Web3 wallet connections
 
 // Send Web Push notification to recipient wallet owner (MODULE LEVEL - accessible from all endpoints)
-async function sendWebPushNotificationToRecipient(transactionData) {
-  try {
-    const recipientWallet = transactionData.to.toLowerCase();
-    const amount = parseFloat(transactionData.amount || 0).toFixed(8);
-    const fromAddress = transactionData.from.toLowerCase();
-    const fromShort = fromAddress.length > 10 ? 
-      `${fromAddress.substring(0, 6)}...${fromAddress.substring(fromAddress.length - 4)}` : fromAddress;
-
-    // Find user by wallet address
-    const userResult = await pool.query(
-      'SELECT id FROM users WHERE LOWER(wallet_address) = $1',
-      [recipientWallet]
-    );
-
-    if (userResult.rows.length === 0) {
-      return;
-    }
-
-    const userId = userResult.rows[0].id;
-
-    // Get all active push subscriptions for this user
-    const subsResult = await pool.query(
-      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1 AND revoked_at IS NULL',
-      [userId]
-    );
-
-    if (subsResult.rows.length === 0) {
-      return;
-    }
-
-    // Prepare notification payload
-    const payload = JSON.stringify({
-      title: 'Received ACCESS',
-      body: `From: ${fromShort}\nAmount: ${amount} ACCESS`,
-      tag: `access-tx-${transactionData.hash || Date.now()}`,
-      data: {
-        type: 'transaction_received',
-        hash: transactionData.hash,
-        amount: amount,
-        from: fromAddress,
-        to: recipientWallet,
-        timestamp: Date.now()
-      }
-    });
-
-    // Send to all subscriptions
-    for (const sub of subsResult.rows) {
-      try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
-          }
-        };
-
-        await webpush.sendNotification(subscription, payload);
-      } catch (pushError) {
-        // If subscription is invalid (410 Gone, 404, or 403 Forbidden/VAPID mismatch), DELETE it
-        if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
-          await pool.query(
-            'DELETE FROM push_subscriptions WHERE endpoint = $1',
-            [sub.endpoint]
-          );
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Push notification error:', error.message);
-  }
-}
+// Duplicate function removed - using the more complete version below
 
 // Initialize missing database columns and network system
         initializeDatabase()
@@ -506,11 +458,15 @@ async function broadcastTransactionLog(transactionData) {
 // Send Web Push notification to recipient wallet owner
 async function sendWebPushNotificationToRecipient(transactionData) {
   try {
+    console.log('📱 [PUSH] Attempting to send notification for transaction:', transactionData.hash);
+    
     const recipientWallet = transactionData.to.toLowerCase();
     const amount = parseFloat(transactionData.amount || 0).toFixed(8);
     const fromAddress = transactionData.from.toLowerCase();
     const fromShort = fromAddress.length > 10 ? 
       `${fromAddress.substring(0, 6)}...${fromAddress.substring(fromAddress.length - 4)}` : fromAddress;
+
+    console.log(`📱 [PUSH] Recipient wallet: ${recipientWallet}`);
 
     // Find user by wallet address
     const userResult = await pool.query(
@@ -519,10 +475,12 @@ async function sendWebPushNotificationToRecipient(transactionData) {
     );
 
     if (userResult.rows.length === 0) {
+      console.log('📱 [PUSH] ❌ No user found with wallet:', recipientWallet);
       return;
     }
 
     const userId = userResult.rows[0].id;
+    console.log(`📱 [PUSH] User ID found: ${userId}`);
 
     // Get all active push subscriptions for this user
     const subsResult = await pool.query(
@@ -530,7 +488,10 @@ async function sendWebPushNotificationToRecipient(transactionData) {
       [userId]
     );
 
+    console.log(`📱 [PUSH] Found ${subsResult.rows.length} active subscriptions for user ${userId}`);
+
     if (subsResult.rows.length === 0) {
+      console.log('📱 [PUSH] ⚠️ No push subscriptions found - user needs to enable notifications');
       return;
     }
 
@@ -588,6 +549,9 @@ async function sendWebPushNotificationToRecipient(transactionData) {
   }
 }
 
+// ✅ Make function globally accessible to fix scope issues
+global.sendWebPushNotificationToRecipient = sendWebPushNotificationToRecipient;
+
               console.log('Database columns verified and created if missing');
 
               // Import and initialize network system
@@ -599,14 +563,21 @@ async function sendWebPushNotificationToRecipient(transactionData) {
                 const networkNode = initializeNetwork();
                 
                 // Wait a moment for network to be ready
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 
                 // Initialize Explorer API after network is ready
                 if (networkNode && networkNode.network) {
                   explorerAPI = new ExplorerAPI(networkNode.network);
                   console.log('🔍 Explorer API initialized - Etherscan-compatible endpoints available');
                 } else {
-                  console.warn('⚠️ Network node not available for Explorer API');
+                  // محاولة ثانية بعد انتظار إضافي
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  if (networkNode && networkNode.network) {
+                    explorerAPI = new ExplorerAPI(networkNode.network);
+                    console.log('🔍 Explorer API initialized (delayed)');
+                  } else {
+                    console.log('ℹ️ Explorer API will initialize when network is ready');
+                  }
                 }
                 
                 // Start continuous sync system
@@ -5677,6 +5648,14 @@ const server = http.createServer(async (req, res) => {
                 console.log(`⚡ SYNC: Recipient balance synced to network state: ${recipientAddress} = ${internalRecipientBalance.toFixed(8)} ACCESS`);
               }
               
+              // ❌ REMOVED: تحديث رصيد المحافظ الخارجية - يتم بالفعل في processTransactionImmediately
+              // هذا الكود كان يسبب إضافة الرصيد مرتين للمستقبل!
+              // if (realExternalRecipient && recipientAddress && !recipientData) {
+              //   const currentBalance = networkNode.network.getBalance(recipientAddress) || 0;
+              //   const newExternalBalance = parseFloat(currentBalance) + parseFloat(numericAmount);
+              //   networkNode.network.updateBalance(recipientAddress, newExternalBalance);
+              // }
+              
               // إنشاء معاملة الشبكة
               const { Transaction } = await import('./network-system.js');
               
@@ -5767,7 +5746,7 @@ const server = http.createServer(async (req, res) => {
               timestamp: timestamp
             };
             
-            await sendWebPushNotificationToRecipient(transactionDataForPush);
+            await global.sendWebPushNotificationToRecipient(transactionDataForPush);
             console.log(`📱 Web Push notification sent to recipient: ${recipientAddress}`);
           } catch (pushError) {
             console.warn('Web Push notification failed (non-critical):', pushError.message);
@@ -7238,6 +7217,14 @@ const server = http.createServer(async (req, res) => {
 
     // Enhanced health check endpoint for deployments and monitoring
     if (pathname === '/health' || pathname === '/ping') {
+      // 🏗️ إضافة إحصائيات البنية التحتية
+      let infraStats = null;
+      if (enterpriseInfrastructure) {
+        try {
+          infraStats = enterpriseInfrastructure.getHealthStatus();
+        } catch (e) {}
+      }
+      
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         status: 'ok',
@@ -7250,8 +7237,33 @@ const server = http.createServer(async (req, res) => {
         deployment_id: process.env.REPL_ID || 'unknown',
         port: process.env.PORT || PORT,
         deployment_success: true,
-        message: 'AccessoireCrypto deployment is running successfully'
+        message: 'AccessoireCrypto deployment is running successfully',
+        infrastructure: infraStats
       }));
+      return;
+    }
+    
+    // 🏗️ Enterprise Stats endpoint
+    if (pathname === '/api/enterprise/stats' && req.method === 'GET') {
+      if (enterpriseInfrastructure) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(enterpriseInfrastructure.getStats()));
+      } else {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Infrastructure not initialized' }));
+      }
+      return;
+    }
+    
+    // 🏗️ Prometheus metrics endpoint
+    if (pathname === '/metrics' && req.method === 'GET') {
+      if (enterpriseInfrastructure) {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end(enterpriseInfrastructure.getPrometheusMetrics());
+      } else {
+        res.writeHead(503, { 'Content-Type': 'text/plain' });
+        res.end('# Infrastructure not initialized');
+      }
       return;
     }
 

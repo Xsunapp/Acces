@@ -94,6 +94,9 @@ class NetworkNode {
     this.instantSync = new InstantWalletSync(this.blockchain); // لتتبع المحافظ المتصلة
     this.processedTransactions = new Set(); // لتتبع المعاملات المعالجة
     this.activeSubscriptions = new Map(); // للاشتراكات النشطة عبر WebSocket
+    
+    // ✅ TRUST WALLET FIX: Cache للمعاملات الأخيرة (لإرجاع receipt فوراً)
+    this.recentTransactionCache = new Map(); // hash -> transaction data
 
     // Initialize advanced anti-attack monitoring system
     this.antiAttackMonitor = new AntiAttackMonitor();
@@ -493,11 +496,34 @@ class NetworkNode {
     this.server = http.createServer((req, res) => {
       this.handleRPCRequest(req, res);
     });
+    
+    // ✅ TRUST WALLET FIX: Increase server timeouts to prevent "socket time expired"
+    this.server.keepAliveTimeout = 120000; // 2 minutes
+    this.server.headersTimeout = 125000; // slightly more than keepAliveTimeout
+    this.server.timeout = 0; // Disable request timeout (Trust Wallet needs this)
 
     // بدء خادم WebSocket للاشتراكات
     this.wss = new WebSocketServer({ server: this.server });
     this.wss.on('connection', (ws) => {
+      // ✅ TRUST WALLET FIX: Set longer ping interval
+      ws.isAlive = true;
+      ws.on('pong', () => { ws.isAlive = true; });
       this.handleWebSocketConnection(ws);
+    });
+    
+    // ✅ TRUST WALLET FIX: Ping all WebSocket clients periodically
+    const pingInterval = setInterval(() => {
+      this.wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) {
+          return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }, 30000); // Every 30 seconds
+    
+    this.wss.on('close', () => {
+      clearInterval(pingInterval);
     });
 
     this.server.listen(this.port, '0.0.0.0', () => {
@@ -828,6 +854,9 @@ class NetworkNode {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    // ✅ TRUST WALLET FIX: Keep connection alive to prevent "socket time expired"
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Keep-Alive', 'timeout=120');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(200);
@@ -1077,8 +1106,8 @@ class NetworkNode {
               symbol: 'ACCESS',
               decimals: 18
             },
-            rpcUrls: [`https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000`],
-            blockExplorerUrls: [`https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-explorer.html#`],
+            rpcUrls: [`https://glowing-space-cod-v665jpxrr4grc6p4p-5000.app.github.dev/`],
+            blockExplorerUrls: [`https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-explorer.html#`],
             // بيانات إضافية لـ MetaMask
             ensAddress: null,
             features: ['EIP155', 'EIP1559', 'AEP20'],
@@ -1490,6 +1519,34 @@ class NetworkNode {
 
             // FIRST: Add to blockchain (سيتم خصم الرصيد هنا تلقائياً)
             const txHash = await Promise.resolve(this.blockchain.addTransaction(transaction));
+
+            // ✅ TRUST WALLET FIX: حفظ المعاملة في cache فوراً للـ receipt
+            if (!this.recentTransactionCache) {
+              this.recentTransactionCache = new Map();
+            }
+            
+            // ✅ FIX: استخدام المتغيرات الصحيحة المعرّفة مسبقاً
+            const txGasFee = (txData.gasPrice * txData.gasLimit) / 1e18;
+            const txGasPrice = txData.gasPrice || 1e9;
+            
+            this.recentTransactionCache.set(txHash, {
+              hash: txHash,
+              txId: txHash,
+              fromAddress: txData.from,
+              toAddress: txData.to,
+              from: txData.from,
+              to: txData.to,
+              amount: typeof txData.value === 'number' ? txData.value : parseFloat(txData.value) || 0,
+              value: typeof txData.value === 'number' ? txData.value : parseFloat(txData.value) || 0,
+              gasFee: txGasFee,
+              gasPrice: txGasPrice,
+              nonce: txData.nonce,
+              timestamp: Date.now(),
+              blockIndex: this.blockchain.chain.length,
+              blockHash: '0x' + crypto.createHash('sha256').update(txHash + Date.now().toString()).digest('hex'),
+              status: 'confirmed'
+            });
+            console.log(`📦 Transaction cached for instant receipt: ${txHash.slice(0, 16)}...`);
 
             // SECOND: Save to database after blockchain processing
             await this.saveTransactionToDatabase(transaction);
@@ -1974,8 +2031,8 @@ class NetworkNode {
               symbol: 'ACCESS',
               decimals: 18
             },
-            rpcUrls: [`https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev:5000`],
-            blockExplorerUrls: [`https://0ea4c3cd-067a-40fa-ab90-078e00bdc8bf-00-1gj4rh7trdf7f.picard.replit.dev/access-explorer.html#`]
+            rpcUrls: [`https://glowing-space-cod-v665jpxrr4grc6p4p-5000.app.github.dev/`],
+            blockExplorerUrls: [`https://glowing-space-cod-v665jpxrr4grc6p4p-3000.app.github.dev/access-explorer.html#`]
           };
           break;
 
@@ -2394,6 +2451,28 @@ class NetworkNode {
           result = [{ parentCapability: 'eth_accounts' }];
           break;
 
+        case 'wallet_getCapabilities':
+          // ✅ إخبار MetaMask بقدرات الشبكة - هذا يوقف Token Detection للشبكات الخاصة
+          result = {
+            '0x5968': { // Chain ID 22888
+              tokenDetection: false,
+              addressResolution: false,
+              nftDetection: false,
+              phishingDetection: false
+            }
+          };
+          break;
+
+        case 'wallet_scanQRCode':
+          // دعم مسح QR code
+          result = null;
+          break;
+
+        case 'wallet_getSnaps':
+          // MetaMask Snaps - غير مدعوم
+          result = {};
+          break;
+
         case 'eth_getCode':
           // Get contract code - for native ACCESS tokens, return empty
           const codeAddress = params[0];
@@ -2496,6 +2575,14 @@ class NetworkNode {
           }
           
           let transaction = this.blockchain.getTransactionByHash(receiptTxHash);
+          
+          // 🔧 TRUST WALLET FIX: Check cache first for instant receipts
+          if (!transaction && this.recentTransactionCache) {
+            transaction = this.recentTransactionCache.get(receiptTxHash);
+            if (transaction) {
+              console.log(`📦 Found transaction in cache: ${receiptTxHash.slice(0, 16)}...`);
+            }
+          }
           
           // 🔧 TRUST WALLET FIX: Check pending transactions if not found in blockchain
           if (!transaction && this.blockchain.pendingTransactions) {
@@ -2644,7 +2731,23 @@ class NetworkNode {
 
         case 'eth_call':
           // معالجة استدعاءات العقود الذكية
-          result = await this.handleContractCall(params[0], params[1] || 'latest');
+          try {
+            result = await this.handleContractCall(params[0], params[1] || 'latest');
+          } catch (callError) {
+            // ✅ إذا كان الخطأ "execution reverted"، نرجعه كـ error response
+            if (callError.code === 3) {
+              return {
+                jsonrpc: '2.0',
+                id: id,
+                error: {
+                  code: 3,
+                  message: 'execution reverted',
+                  data: '0x'
+                }
+              };
+            }
+            throw callError;
+          }
           break;
 
         case 'eth_getLogs':
@@ -2860,10 +2963,12 @@ class NetworkNode {
       transaction.hash = txData.hash || transaction.txId;
 
       // إضافة المعاملة إلى البلوك تشين
-      const txHash = this.blockchain.addTransaction(transaction);
+      // ⚠️ CRITICAL: addTransaction يستدعي processTransactionImmediately داخلياً
+      // والذي يقوم بتحديث الأرصدة - لذلك لا نحتاج لاستدعاء processTransactionBalances!
+      const txHash = await this.blockchain.addTransaction(transaction);
 
-      // معالجة المعاملة فوراً - خصم من المرسل وإضافة للمستقبل
-      await this.processTransactionBalances(transaction);
+      // ❌ REMOVED: processTransactionBalances - كان يسبب إضافة الرصيد مرتين!
+      // await this.processTransactionBalances(transaction);
 
       // تأكيد المعاملة فوراً
       try {
@@ -4897,13 +5002,15 @@ class NetworkNode {
       // ✅ التحقق من أن العنوان صحيح
       if (!to || !this.isValidEthereumAddress(to)) {
         console.warn(`⚠️ eth_call on invalid address: ${to}`);
-        throw new Error('Invalid contract address');
+        // ✅ إرجاع خطأ "execution reverted" - هذا يخبر MetaMask أن العنوان ليس عقد
+        throw { code: 3, message: 'execution reverted', data: '0x' };
       }
 
       // ✅ التحقق من أن البيانات موجودة
       if (!data || data.length < 10) {
         console.log(`⚠️ eth_call with no function data on ${to}, treating as EOA`);
-        return '0x';
+        // ✅ إرجاع خطأ "execution reverted" للـ EOA
+        throw { code: 3, message: 'execution reverted', data: '0x' };
       }
 
       // استخراج function selector (أول 4 bytes)
@@ -4946,24 +5053,29 @@ class NetworkNode {
           return '0x' + totalSupplyInWei.toString(16).padStart(64, '0');
 
         case '0x01ffc9a7': // supportsInterface(bytes4) - ERC165
-          // ✅ للعناوين العادية (EOA)، نقول أننا لا ندعم أي interfaces
-          console.log(`🔍 supportsInterface call on ${to} - returning false for EOA`);
-          return '0x0000000000000000000000000000000000000000000000000000000000000000'; // false
+          // ✅ للعناوين العادية (EOA)، نرجع "execution reverted" بدلاً من false
+          // هذا يخبر MetaMask أن العنوان ليس عقد ذكي
+          console.log(`🔍 supportsInterface call on ${to} - returning revert for EOA (not a contract)`);
+          throw { code: 3, message: 'execution reverted', data: '0x' };
 
         case '0x06fdde03': // name()
           const nameFunc = Buffer.from('Access Coin').toString('hex');
           return '0x' + '0'.repeat(64) + nameFunc.length.toString(16).padStart(64, '0') + nameFunc.padEnd(64, '0');
 
         default:
-          // ⚠️ Unknown function selector - ترجع فارغ تماماً (zero) لتخبر MetaMask أن العنوان EOA
-          console.log(`🔍 Unknown function selector: ${functionSelector} on address ${to} - this is EOA, not contract`);
-          // ✅ ترجع 0x (فارغ تماماً) - هذا هو الرد الصحيح للـ EOA
-          return '0x';
+          // ⚠️ Unknown function selector - ترجع "execution reverted" للـ EOA
+          console.log(`🔍 Unknown function selector: ${functionSelector} on address ${to} - returning revert (EOA, not contract)`);
+          // ✅ ترجع خطأ revert - هذا يخبر MetaMask أن العنوان ليس contract
+          throw { code: 3, message: 'execution reverted', data: '0x' };
       }
     } catch (error) {
+      // ✅ إذا كان الخطأ من نوع revert، نرميه كما هو
+      if (error.code === 3) {
+        throw error;
+      }
       console.error('Error handling contract call:', error);
-      // ✅ عند حدوث خطأ، ترجع 0x (هذا يخبر MetaMask أن العنوان ليس contract)
-      return '0x';
+      // ✅ عند حدوث خطأ آخر، نرجع revert أيضاً
+      throw { code: 3, message: 'execution reverted', data: '0x' };
     }
   }
 
