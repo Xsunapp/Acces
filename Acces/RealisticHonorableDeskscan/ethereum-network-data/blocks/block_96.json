@@ -27,7 +27,10 @@
       "input": "0x",
       "isContractDeployment": false,
       "processed": true,
-      "balanceUpdated": true
+      "balanceUpdated": true,
+      "blockNumber": 96,
+      "blockHash": "12ba69f8c990771cbc24e628c1437bb7f586a79500f6cb81c74faf1960a4f54c",
+      "confirmations": 8
     },
     {
       "fromAddress": null,
@@ -47,7 +50,7 @@
   "nonce": 0,
   "hash": "12ba69f8c990771cbc24e628c1437bb7f586a79500f6cb81c74faf1960a4f54c",
   "merkleRoot": "2b6baf2fc1993334512ebe82d142e996a2f825c7c2fa88188a631fc79a272f1d",
-  "persistentHash": "931365eec22bfa1b79ecb083b260e70cdde02756aee47f2666f4f072bc4efa26",
-  "savedAt": 1767142342500,
+  "persistentHash": "887f02137cb125bf7dd9d55b4f2c1d3b4a99b34f01b950dd7af6ce7b7ce50f8d",
+  "savedAt": 1767142491480,
   "ethereumStyle": true
 }
