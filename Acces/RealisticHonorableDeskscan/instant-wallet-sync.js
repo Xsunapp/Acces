@@ -7,25 +7,25 @@ class InstantWalletSync extends EventEmitter {
     this.blockchain = blockchain;
     this.walletConnections = new Map();
     this.subscriptions = new Map();
-    this.syncInterval = 50; // 50ms فقط - أسرع من قبل
-    this.trustWalletOptimizations = true; // تحسينات خاصة لـ Trust Wallet
-    this.forceRefreshQueue = new Set(); // قائمة التحديث القسري
-    // Add a set to track wallets that need balance updates
+    this.syncInterval = 10; // ⚡ 10ms - أسرع 5 مرات من قبل
+    this.trustWalletOptimizations = true;
+    this.forceRefreshQueue = new Set();
     this.trackedWallets = new Set();
+    this.lastBalanceMap = new Map(); // لتتبع التغييرات
     this.setupInstantSync();
   }
 
   setupInstantSync() {
-    // 🚀 مزامنة فائقة السرعة كل 50ms - محسنة لـ Trust Wallet
+    // ⚡ ETHEREUM-STYLE: مزامنة فائقة السرعة كل 10ms
     setInterval(() => {
       this.syncAllWalletsEnhanced();
       this.processForceRefreshQueue();
     }, this.syncInterval);
 
-    // مزامنة إضافية كل 200ms لـ Trust Wallet
+    // ⚡ Trust Wallet مزامنة كل 50ms
     setInterval(() => {
       this.trustWalletSpecialSync();
-    }, 200);
+    }, 50);
 
     // استمع لأحداث البلوك تشين
     this.blockchain.on('transaction', (tx) => {
@@ -169,10 +169,10 @@ class InstantWalletSync extends EventEmitter {
           }
         ];
 
-        // إرسال جميع الإشعارات بسرعة
+        // إرسال جميع الإشعارات بسرعة فائقة
         for (const notification of notifications) {
           connection.send(JSON.stringify(notification));
-          await new Promise(resolve => setTimeout(resolve, 5)); // 5ms بين كل إشعار
+          await new Promise(resolve => setTimeout(resolve, 1)); // ⚡ 1ms فقط - فوري
         }
 
         console.log(`📡 Instant balance update sent to ${address}: ${actualBalance.toFixed(8)} ACCESS (${eventType})`);
@@ -322,7 +322,7 @@ class InstantWalletSync extends EventEmitter {
           // Send all notifications rapidly
           for (const notification of trustWalletUltraSync) {
             connection.send(JSON.stringify(notification));
-            await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
+            await new Promise(resolve => setTimeout(resolve, 10)); // ⚡ 10ms - أسرع
           }
         } catch (error) {
           console.warn('Trust Wallet ultra sync error:', error.message);
@@ -481,6 +481,79 @@ class InstantWalletSync extends EventEmitter {
     this.walletConnections.delete(address.toLowerCase());
     // Remove from tracked wallets
     this.trackedWallets.delete(address.toLowerCase());
+  }
+
+  // 🚀 CRITICAL: إشعار فوري بتحديث الرصيد للمحافظ الخارجية
+  async notifyBalanceUpdate(address, newBalance, eventType = 'balance_update') {
+    try {
+      const normalizedAddress = address.toLowerCase();
+      const balanceHex = '0x' + Math.floor(newBalance * 1e18).toString(16);
+      
+      console.log(`📡 INSTANT BALANCE NOTIFICATION: ${normalizedAddress.slice(0, 10)}... = ${newBalance.toFixed(8)} ACCESS (${eventType})`);
+      
+      // 1. إشعار المحفظة المتصلة عبر WebSocket (إن وجدت)
+      const connection = this.walletConnections.get(normalizedAddress);
+      if (connection && connection.readyState === 1) {
+        const notifications = [
+          // إشعار الرصيد الفوري
+          {
+            jsonrpc: '2.0',
+            method: 'eth_subscription',
+            params: {
+              subscription: '0xbalance',
+              result: {
+                address: normalizedAddress,
+                balance: balanceHex,
+                balanceFormatted: newBalance.toFixed(8) + ' ACCESS',
+                eventType: eventType,
+                timestamp: Date.now()
+              }
+            }
+          },
+          // إشعار تغيير الحسابات (يجبر المحفظة على التحديث)
+          {
+            jsonrpc: '2.0',
+            method: 'accountsChanged',
+            params: [normalizedAddress]
+          },
+          // إشعار تغيير الأصول (Trust Wallet)
+          {
+            jsonrpc: '2.0',
+            method: 'wallet_assetsChanged',
+            params: {
+              chainId: '0x5968',
+              assets: [{
+                address: normalizedAddress,
+                balance: balanceHex,
+                symbol: 'ACCESS',
+                decimals: 18
+              }]
+            }
+          }
+        ];
+
+        for (const notification of notifications) {
+          try {
+            connection.send(JSON.stringify(notification));
+          } catch (e) {}
+        }
+      }
+      
+      // 2. إضافة للقائمة للتحديث القسري
+      this.addToForceRefreshQueue(normalizedAddress);
+      
+      // 3. إرسال حدث لـ NetworkNode للبث عبر جميع القنوات
+      this.emit('balanceUpdated', {
+        address: normalizedAddress,
+        balance: newBalance,
+        balanceHex: balanceHex,
+        eventType: eventType,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      console.error(`Error in notifyBalanceUpdate for ${address}:`, error.message);
+    }
   }
 
   // معالجة كتلة جديدة تم تعدينها - إشعار فوري لجميع المحافظ

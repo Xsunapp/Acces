@@ -1,9 +1,9 @@
 {
   "address": "0x42b232dd4f879ddf391c1da7c924ecb056317033",
-  "balance": "0.93194",
+  "balance": "0",
   "nonce": 0,
   "codeHash": "0x",
   "storageRoot": "0x",
-  "updatedAt": 1767142512985,
+  "updatedAt": 1767904565077,
   "ethereumStyle": true
 }

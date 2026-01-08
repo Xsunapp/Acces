@@ -277,8 +277,8 @@
       // التأكد من أن remainingSeconds رقم صحيح
       const validSeconds = Math.max(0, Math.floor(remainingSeconds || 0));
 
-      if (reason === 'already_boosted_this_session' || reason === 'not_mining') {
-        // عرض الوقت المتبقي للجلسة الحالية
+      if (reason === 'already_boosted_this_session') {
+        // الجلسة نشطة والتعزيز مفعل - عرض الوقت المتبقي للجلسة
         const hours = Math.floor(validSeconds / 3600);
         const minutes = Math.floor((validSeconds % 3600) / 60);
 
@@ -290,6 +290,10 @@
         } else {
           timeText = '00h 00m';
         }
+      } else if (reason === 'not_mining') {
+        // الجلسة غير نشطة - يجب بدء التعدين أولاً
+        messageText = document.getElementById('ad-boost-start-mining')?.textContent || 'Start activity first to watch an ad';
+        timeText = ''; // لا نعرض وقت عندما لا يكون هناك جلسة
       } else if (reason === 'boost_pending') {
         messageText = 'Ad boost granted! Start mining to activate it.';
         timeText = '';

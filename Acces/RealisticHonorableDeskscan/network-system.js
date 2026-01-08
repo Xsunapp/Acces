@@ -237,10 +237,12 @@ class AccessNetwork extends EventEmitter {
     // تهيئة البيانات الافتراضية المحسنة للحجم الضخم
     this.pendingTransactions = [];
 
-    // 🔒 نظام حجز الأرصدة المحسن
-    this.reservedBalances = new Map();
-    this.pendingReservations = new Map();
-    this.reservationTimeout = 5 * 60 * 1000;
+    // 🔒 نظام حجز الأرصدة - معطل (نستخدم طريقة Ethereum المباشرة)
+    this.reservedBalances = new Map(); // للتوافق مع الكود القديم فقط
+    this.pendingReservations = new Map(); // للتوافق مع الكود القديم فقط
+    this.reservationTimeout = 30 * 1000; // غير مستخدم - Ethereum style
+    
+    // ✅ ETHEREUM-STYLE: لا حجز - الخصم المباشر عند إضافة المعاملة
 
     // تحسينات للمعالجة الضخمة
     this.peers = new Set();
@@ -740,8 +742,8 @@ class AccessNetwork extends EventEmitter {
       }
     }
 
-    // ✅ SECURITY FIX: Reserve gas fee even for contract deployment (gas must be paid!)
-    // Only skip reservation for system transactions
+    // ✅ SECURITY FIX: التحقق من الرصيد فقط (بدون حجز) - ETHEREUM STYLE
+    // Only skip check for system transactions
     if (fromAddress && fromAddress !== null && !isSystemTransaction) {
       const normalizedFromAddress = fromAddress.toLowerCase();
       const gasFeeAmount = parseFloat(gasFee || this.gasPrice) || 0;
@@ -753,37 +755,20 @@ class AccessNetwork extends EventEmitter {
         throw new Error(`❌ Invalid transaction amounts: amount=${amountToSend}, fee=${gasFeeAmount}`);
       }
 
-      // 🔒 IMMEDIATE BALANCE RESERVATION - يحجز الرصيد فوراً
+      // ✅ ETHEREUM-STYLE: التحقق من الرصيد المباشر (بدون حجز)
       const currentBalance = this.getBalance(normalizedFromAddress);
       if (!isFinite(currentBalance) || currentBalance < 0) {
         throw new Error(`❌ Invalid account balance: ${currentBalance}`);
       }
-      
-      const reservedAmount = this.reservedBalances.get(normalizedFromAddress) || 0;
-      if (!isFinite(reservedAmount) || reservedAmount < 0) {
-        throw new Error(`❌ Invalid reserved amount: ${reservedAmount}`);
-      }
-      
-      const availableBalance = currentBalance - reservedAmount;
 
-      // رفض فوري إذا كان الرصيد المتاح غير كافي
-      if (availableBalance < totalRequired) {
-        const errorMsg = `🚫 INSUFFICIENT AVAILABLE BALANCE: Required ${totalRequired.toFixed(8)} ACCESS, Available ${availableBalance.toFixed(8)} ACCESS (Reserved: ${reservedAmount.toFixed(8)} ACCESS)`;
+      // رفض فوري إذا كان الرصيد غير كافي - بدون نظام حجز
+      if (currentBalance < totalRequired) {
+        const errorMsg = `🚫 INSUFFICIENT BALANCE: Required ${totalRequired.toFixed(8)} ACCESS, Available ${currentBalance.toFixed(8)} ACCESS`;
         console.error(errorMsg);
         throw new Error(errorMsg);
       }
-
-      // 🔒RESERVE BALANCE IMMEDIATELY - حجز فوري
-      this.reservedBalances.set(normalizedFromAddress, reservedAmount + totalRequired);
-      this.pendingReservations.set(txId, {
-        address: normalizedFromAddress,
-        amount: totalRequired,
-        timestamp: Date.now(),
-        txId: txId
-      });
-
-      // تنظيف الحجوزات القديمة (أكثر من 5 دقائق)
-      this.cleanupExpiredReservations();
+      
+      // ✅ لا حجز - الخصم سيتم في processTransactionImmediately
     }
 
     // ✅ CONTRACT: Allow 0 amount for contract deployment and contract calls
@@ -793,19 +778,11 @@ class AccessNetwork extends EventEmitter {
 
     // التحقق من صحة البيانات - لكن نسمح بالعقود
     if (!isContractDeployment && !isContractCall && (!toAddress || amount <= 0)) {
-      // إلغاء الحجز في حالة الخطأ
-      if (fromAddress && !isSystemTransaction) {
-        this.releaseReservation(txId);
-      }
       throw new Error('Invalid transaction data');
     }
 
     // التحقق الإضافي للمعاملات العادية فقط (ليس للعقود)
     if (!isContractDeployment && fromAddress && (!fromAddress.match(/^0x[a-f0-9]{40}$/) || !toAddress.match(/^0x[a-f0-9]{40}$/))) {
-      // إلغاء الحجز في حالة الخطأ
-      if (fromAddress && !isSystemTransaction) {
-        this.releaseReservation(txId);
-      }
       throw new Error('Invalid address format');
     }
 
@@ -904,14 +881,56 @@ class AccessNetwork extends EventEmitter {
 
 
 
-    // معالجة الأرصدة فوراً عند الإضافة - مرة واحدة فقط
-    // ✅ CRITICAL: تخطي معالجة الأرصدة إذا تمت معالجتها مسبقاً (من server.js)
-    if (transaction.skipBalanceProcessing || transaction.balanceUpdated) {
-      console.log(`⏭️ Skipping balance processing for ${txId.slice(0, 16)} (already processed)`);
+    // ⚡ ETHEREUM-STYLE: تحديث الأرصدة فوراً ومتزامناً (BLOCKING) قبل إرجاع txId
+    // ✅ CRITICAL: تخطي معالجة الأرصدة إذا تمت معالجتها مسبقاً
+    if (transaction.skipBalanceProcessing || transaction.balanceUpdated || transaction.balancesAlreadyUpdated) {
+      console.log(`⏭️ Skipping balance for ${txId.slice(0, 16)} (already processed)`);
     } else {
-      // ⚡ INSTANT: تحديث الأرصدة فوراً بدون await
-      this.updateBalancesSyncWithPersistence(transaction);
-      console.log(`✅ Transaction ${txId.slice(0, 16)} balances updated instantly`);
+      // ⚡ DIRECT UPDATE ONLY - بدون استدعاء updateBalancesSyncWithPersistence لتجنب الخصم المزدوج
+      const fromAddr = (transaction.fromAddress || transaction.from)?.toLowerCase();
+      const toAddr = (transaction.toAddress || transaction.to)?.toLowerCase();
+      const amount = parseFloat(transaction.amount) || 0;
+      const gasFee = parseFloat(transaction.gasFee || 0.00002) || 0;
+      
+      const isSystemTx = !fromAddr || 
+                         fromAddr === '0x0000000000000000000000000000000000000000' ||
+                         transaction.isMigration === true ||
+                         transaction.isGenesis === true;
+      
+      // خصم من المرسل
+      if (fromAddr && !isSystemTx) {
+        const currentFrom = this.balances.get(fromAddr) || 0;
+        const totalDeduct = amount + gasFee;
+        const newFrom = Math.max(0, currentFrom - totalDeduct);
+        this.balances.set(fromAddr, newFrom);
+        
+        // تحديث accountCache أيضاً
+        if (this.accessStateStorage?.accountCache) {
+          const weiBalance = Math.floor(newFrom * 1e18).toString();
+          this.accessStateStorage.accountCache[fromAddr] = { balance: weiBalance, nonce: (transaction.nonce || 0) + 1 };
+        }
+        
+        console.log(`⚡ DEDUCT: ${fromAddr.slice(0,10)}... ${currentFrom.toFixed(4)} - ${totalDeduct.toFixed(4)} = ${newFrom.toFixed(4)}`);
+      }
+      
+      // إضافة للمستلم
+      if (toAddr && amount > 0) {
+        const currentTo = this.balances.get(toAddr) || 0;
+        const newTo = currentTo + amount;
+        this.balances.set(toAddr, newTo);
+        
+        // تحديث accountCache أيضاً
+        if (this.accessStateStorage?.accountCache) {
+          const weiBalance = Math.floor(newTo * 1e18).toString();
+          this.accessStateStorage.accountCache[toAddr] = { balance: weiBalance, nonce: 0 };
+        }
+        
+        console.log(`⚡ CREDIT: ${toAddr.slice(0,10)}... ${currentTo.toFixed(4)} + ${amount.toFixed(4)} = ${newTo.toFixed(4)}`);
+      }
+      
+      // منع أي معالجة لاحقة
+      transaction.balancesAlreadyUpdated = true;
+      transaction.balanceUpdated = true;
     }
 
     // إضافة إلى mempool
@@ -1018,9 +1037,15 @@ class AccessNetwork extends EventEmitter {
     return;
   }
 
-  // ⚡ FIXED: تحديث الأرصدة بشكل متزامن مع الحفظ الفوري
+  // ⚡ FIXED: تحديث الأرصدة بشكل متزامن مع الحفظ الفوري - مرة واحدة فقط
   updateBalancesSyncWithPersistence(transaction) {
     try {
+      // ⚡ CRITICAL: منع الخصم المزدوج
+      if (transaction.balancesAlreadyUpdated) {
+        console.log(`⏭️ Balance already updated for ${transaction.hash?.slice(0, 16) || 'unknown'}, skipping`);
+        return true;
+      }
+      
       const fromAddress = transaction.fromAddress;
       const toAddress = transaction.toAddress;
       const amount = parseFloat(transaction.amount) || 0;
@@ -1112,6 +1137,9 @@ class AccessNetwork extends EventEmitter {
         this.ethereumStorage.saveState({ balances: balancesObj }).catch(() => {});
       }
       
+      // ⚡ وضع علامة لمنع الخصم المزدوج
+      transaction.balancesAlreadyUpdated = true;
+      
       return true;
     } catch (error) {
       console.error('❌ updateBalancesSyncWithPersistence error:', error.message);
@@ -1122,6 +1150,12 @@ class AccessNetwork extends EventEmitter {
   // معالجة المعاملة فوراً عند الإضافة - مرة واحدة فقط مع ضمان وصول الرصيد
   async processTransactionImmediately(transaction) {
     try {
+      // ⚡ CRITICAL: منع الخصم المزدوج - إذا تمت المعالجة مسبقاً
+      if (transaction.balancesAlreadyUpdated || transaction.balanceProcessedInImmediate) {
+        console.log(`⏭️ processTransactionImmediately: Skipping ${transaction.hash?.slice(0, 16) || 'unknown'} (already processed)`);
+        return;
+      }
+      
       const fromAddress = transaction.fromAddress;
       const toAddress = transaction.toAddress;
       const amount = parseFloat(transaction.amount);
@@ -1389,6 +1423,12 @@ class AccessNetwork extends EventEmitter {
 
       // 🛡️ ATOMICITY: تأكيد اكتمال المعاملة بنجاح
       await transactionRecovery.confirmTransaction(txId);
+      
+      // ⚡ وضع علامة لمنع الخصم المزدوج
+      transaction.balanceProcessedInImmediate = true;
+      transaction.balancesAlreadyUpdated = true;
+      
+      // ✅ تم إلغاء نظام الحجز - الرصيد يُخصم مباشرة
 
     } catch (error) {
       console.error('❌ TRANSACTION PROCESSING FAILED:', error);
@@ -1396,17 +1436,6 @@ class AccessNetwork extends EventEmitter {
       // 🛡️ ATOMICITY: إلغاء المعاملة واسترداد الرصيد
       const txId = transaction.txId || transaction.hash;
       await transactionRecovery.cancelTransaction(txId, this);
-
-      // في حالة الفشل، تحرير أي حجوزات
-      const fromAddress = transaction.fromAddress;
-      const isSystemTransaction = fromAddress === null ||
-                                 fromAddress === '0x0000000000000000000000000000000000000000' ||
-                                 transaction.isMigration === true ||
-                                 transaction.isGenesis === true;
-
-      if (fromAddress && !isSystemTransaction && txId) {
-        this.releaseReservation(txId);
-      }
       throw error;
     }
   }
@@ -2495,35 +2524,22 @@ class AccessNetwork extends EventEmitter {
     }
   }
 
-  // تنظيف الحجوزات منتهية الصلاحية
+  // تنظيف الحجوزات منتهية الصلاحية - معطل (ETHEREUM-STYLE)
   cleanupExpiredReservations() {
-    const now = Date.now();
-    for (const [txId, reservation] of this.pendingReservations.entries()) {
-      if ((now - reservation.timestamp) > this.reservationTimeout) {
-        this.releaseReservation(txId);
-      }
-    }
+    // ✅ ETHEREUM-STYLE: لا نستخدم الحجوزات - هذه الدالة فارغة
+  }
+  
+  // 🔄 إعادة تعيين جميع الحجوزات - معطل (ETHEREUM-STYLE)
+  resetAllReservations() {
+    // ✅ ETHEREUM-STYLE: لا نستخدم الحجوزات
+    this.reservedBalances.clear();
+    this.pendingReservations.clear();
+    console.log(`🔄 ETHEREUM-STYLE: لا حجوزات - الرصيد يُخصم مباشرة`);
   }
 
-  // تحرير حجز رصيد
+  // تحرير حجز رصيد - معطل (ETHEREUM-STYLE)
   releaseReservation(txId) {
-    const reservation = this.pendingReservations.get(txId);
-    if (!reservation) return;
-
-    const { address, amount } = reservation;
-    const currentReserved = this.reservedBalances.get(address) || 0;
-
-    // تأكد من أن المبلغ المراد تحريره موجود بالفعل في الحجز
-    if (currentReserved >= amount) {
-      const newReservedBalance = currentReserved - amount;
-      this.reservedBalances.set(address, newReservedBalance);
-      console.log(`🔓 Released reservation for ${address}: ${amount.toFixed(8)} ACCESS. New reserved total: ${newReservedBalance.toFixed(8)} ACCESS`);
-    } else {
-      console.warn(`⚠️ Warning: Attempted to release more reserved balance for ${address} than currently held.`);
-      this.reservedBalances.set(address, 0); // Reset to 0 if there's a discrepancy
-    }
-
-    this.pendingReservations.delete(txId);
+    // ✅ ETHEREUM-STYLE: لا نستخدم الحجوزات - هذه الدالة فارغة
   }
 
 

@@ -561,17 +561,44 @@ background-color: rgba(0, 0, 0, 0.8);
 }
 
 
-.copy-btn, .toggle-btn {
+#network-page .copy-btn, #network-page .toggle-btn {
   background: none;
   border: none;
-  color: var(--light-text);
+  color: var(--light-text, #666666);
   cursor: pointer;
   font-size: 1rem;
-  transition: color 0.2s;
+  transition: color 0.3s, transform 0.2s;
+  outline: none;
 }
 
-.copy-btn:hover, .toggle-btn:hover {
-  color: var(--primary-color);
+#network-page .copy-btn:focus, #network-page .toggle-btn:focus {
+  outline: none;
+  box-shadow: none;
+  background: none;
+}
+
+#network-page .copy-btn:hover, #network-page .toggle-btn:hover {
+  color: var(--primary-color, #4a90d9);
+}
+
+#network-page .copy-btn.copied {
+  color: #10b981 !important;
+  transform: scale(1.1);
+}
+
+#network-page .copy-btn.copied i {
+  animation: checkPop 0.3s ease;
+}
+
+/* Ensure copy button icon is always visible */
+#network-page .copy-btn i, #network-page .toggle-btn i {
+  color: inherit;
+}
+
+@keyframes checkPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .key-warning {

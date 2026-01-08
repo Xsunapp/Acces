@@ -57,16 +57,22 @@ class OfflineDetector {
     // Double-check with real connection test before going online
     this.checkConnection().then(isReallyOnline => {
       if (isReallyOnline) {
-        console.log('Connection restored - going online');
+        console.log('Connection restored - reloading page for smooth experience');
         this.isOnline = true;
 
-        // Hide offline page
+        // Hide offline page first
         this.hideOfflinePage();
 
-        // Show success notification if available
+        // Show success notification briefly before reload
         if (typeof showNotification === 'function') {
-          showNotification(this.translator.translate('Connection restored'), 'success');
+          showNotification(this.translator.translate('Connection restored - refreshing...'), 'success');
         }
+
+        // Reload page after a brief delay to ensure smooth transition
+        // This prevents glitches and ensures all resources load correctly
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
       }
     });
   }

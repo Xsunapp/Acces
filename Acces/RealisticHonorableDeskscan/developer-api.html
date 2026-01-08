@@ -592,6 +592,7 @@
             max-width: 400px;
             max-height: 90vh;
             overflow-y: auto;
+            position: relative;
         }
 
         .auth-header {
@@ -1502,7 +1503,7 @@
     </div>
 
     <!-- Google Sign In Modal -->
-    <div class="auth-modal" id="authModal">
+    <div class="auth-modal" id="authModal" onclick="if(event.target === this) hideAuthModal()">
         <div class="auth-container">
             <button class="auth-close" onclick="hideAuthModal()">×</button>
 

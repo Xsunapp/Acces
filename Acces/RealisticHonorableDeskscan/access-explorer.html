@@ -21,8 +21,8 @@
             --text-secondary: #6c757d;
             --border-color: #e1e8ed;
             --accent-color: #0969da;
-            --accent-purple: var(--accent-purple);
-            --accent-blue: var(--accent-blue);
+            --accent-purple: #7c3aed;
+            --accent-blue: #3b82f6;
             --footer-bg: #f8f9fa;
             --footer-text: #333;
             --search-bg: #ffffff;
@@ -1069,6 +1069,7 @@
             max-width: 400px;
             max-height: 90vh;
             overflow-y: auto;
+            position: relative;
         }
 
         .auth-header {
@@ -2152,7 +2153,7 @@
     </div>
 
     <!-- Google Sign In Modal -->
-    <div class="auth-modal" id="authModal">
+    <div class="auth-modal" id="authModal" onclick="if(event.target === this) hideAuthModal()">
         <div class="auth-container">
             <button class="auth-close" onclick="hideAuthModal()">×</button>
 
@@ -2192,10 +2193,10 @@
     <footer class="footer">
         <div class="footer-content">
             <div class="footer-links">
-                <a href="#" class="footer-link">About</a>
-                <a href="#" class="footer-link">FAQ</a>
+                <a href="about.html" class="footer-link">About</a>
+                <a href="faq.html" class="footer-link">FAQ</a>
                 <a href="developer-api.html" class="footer-link">API</a>
-                <a href="#" class="footer-link">Contact Us</a>
+                <a href="contact.html" class="footer-link">Contact Us</a>
                 <a href="terms-of-service.html" class="footer-link">Terms</a>
             </div>
             <p>&copy; 2025 AccessScan. All rights reserved.</p>

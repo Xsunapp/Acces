@@ -25,7 +25,7 @@
   <meta name="msapplication-TileColor" content="#4a90e2">
   <meta name="msapplication-tap-highlight" content="no">
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="access-logo-1 ipfs.png">
+  <link rel="apple-touch-icon" href="access-logo-1ipfs.png">
   
   <title>Access Platform - Digital Points System</title>
 
@@ -474,6 +474,9 @@
   <!-- Sign Out Confirmation Modal -->
   <div id="signOutModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
 
+<!-- Install Prompt System -->
+  <script src="install-prompt.js"></script>
+
 <!-- Notification System -->
   <script src="notification-system.js"></script>
 
@@ -894,7 +897,7 @@ document.addEventListener('balanceUpdated', function(event) {
     <div class="login-box">
       <div class="logo-container">
         <div class="login-title-container">
-          <img src="image__2_-removebg-preview.png" alt="AccessDigital Logo" class="login-logo">
+          <img src="accessoire-app.png" alt="AccessDigital Logo" class="login-logo">
           <h1>AccessDigital</h1>
         </div>
         <p class="tagline" data-translate="Digital engagement rewards platform">Digital engagement rewards platform</p>
@@ -957,7 +960,7 @@ document.addEventListener('balanceUpdated', function(event) {
     <!-- Sidebar (for desktop) -->
     <div id="sidebar" class="sidebar">
       <div class="sidebar-header">
-        <img src="image__2_-removebg-preview.png" alt="AccessDigital" class="logo">
+        <img src="accessoire-app.png" alt="AccessDigital" class="logo">
         <button id="toggle-sidebar" class="toggle-sidebar-btn">
           <i class="fas fa-bars"></i>
         </button>
@@ -1101,7 +1104,7 @@ document.addEventListener('balanceUpdated', function(event) {
                 <div class="network-selector-container">
                   <div class="network-selector" onclick="toggleNetworkDropdown()">
                     <div class="network-info">
-                       <img src="image__2_-removebg-preview.png" alt="Access" class="network-logo">
+                       <img src="accessoire-app.png" alt="Access" class="network-logo">
                       <span class="network-name" data-translate="Access Chain">Access Chain</span>
 
                       <div class="chain-icon-container">
@@ -1203,18 +1206,14 @@ document.addEventListener('balanceUpdated', function(event) {
               <!-- Primary Action Buttons -->
               <div class="primary-action-buttons">
                 <button class="action-button start-activity-btn" onclick="navigateToPage('activity')">
-                   <i class="fas fa-play"></i>
-                  
-                  <span data-translate="Start" style="background: linear-gradient(135deg, #667eea 0%);">
-  Start </span>
-
+                   
+                  <span data-translate="Start">Start</span>
+                  <i class="fas fa-play"></i>
                 </button>
                 <button class="action-button referrals-btn" onclick="navigateToPage('referrals')">
-
-                  <span data-translate="Referrals" style="background: linear-gradient(135deg, #667eea 0%);">Referrals </span>
+                  <span data-translate="Referrals">Referrals</span>
                   <i class="fas fa-users"></i>
                 </button>
-
               </div>
 
               <!-- Secondary Action Buttons -->
@@ -1332,7 +1331,7 @@ document.addEventListener('balanceUpdated', function(event) {
                      <span data-translate="Referral Benefits">Referral Benefits</span>
 
                 <span class="bonus-value">0</span>
-                <img src="image__2_-removebg-preview.png" alt="Referral Logo" class="referral-bonus-logo">
+                <img src="accessoire-app.png" alt="Referral Logo" class="referral-bonus-logo">
               </div>
               <div class="bonus-text" data-translate="bonusText">Get 0.15 points for each friend who joins using your referral code!</div>
             </div>
@@ -1427,7 +1426,7 @@ document.addEventListener('balanceUpdated', function(event) {
             <div class="profile-text-container">
               <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%;">
                 <div id="profile-name" class="profile-name-display">
-                  <img src="image__2_-removebg-preview.png" alt="Logo" class="mini-logo">
+                  <img src="accessoire-app.png" alt="Logo" class="mini-logo">
                   User
                 </div>
 
@@ -1455,7 +1454,7 @@ document.addEventListener('balanceUpdated', function(event) {
         <div class="stats-grid">
           <div class="stat-card balance-card">
             <div class="stat-icons">
-              <img src="image__2_-removebg-preview.png" alt="Logo" class="mini-logo">
+              <img src="accessoire-app.png" alt="Logo" class="mini-logo">
             </div>
             <div class="stat-content">
               <h3 data-translate="Balance">Balance</h3>
@@ -1669,10 +1668,7 @@ document.addEventListener('balanceUpdated', function(event) {
           <label data-translate="Your Account Address">Your Account Address</label>
           <div class="account-address">
             <span id="user-account-address"></span>
-            <button id="copy-account-address" class="copy-btn" onclick="copyAccountAddress()">
-
-              <i class="fas fa-copy"></i>
-            </button>
+            <button id="copy-account-address" class="copy-btn" onclick="copyAccountAddress()"><i class="fas fa-copy"></i></button>
           </div>
         </div>
 
@@ -1900,7 +1896,7 @@ document.addEventListener('balanceUpdated', function(event) {
                   <button class="balance-privacy-toggle" onclick="window.BalancePrivacyManager?.togglePrivacy()">
                     <i class="fas fa-eye"></i>
                   </button>
-                   <img src="image__2_-removebg-preview.png" alt="Access Logo" class="balance-logo">
+                   <img src="accessoire-app.png" alt="Access Logo" class="balance-logo">
 
                   <span id="withdraw-balance">0</span>
 
@@ -1953,7 +1949,7 @@ document.addEventListener('balanceUpdated', function(event) {
                 <div class="amount-input-container">
                   <input type="number" id="withdraw-amount" min="100" step="0.01" data-translate-placeholder="Enter amount" placeholder="Enter amount">
                   <div class="input-suffix">
-                    <img src="image__2_-removebg-preview.png" alt="Access" class="input-logo">
+                    <img src="accessoire-app.png" alt="Access" class="input-logo">
                     <span>Points</span>
                   </div>
                 </div>
@@ -2056,7 +2052,7 @@ document.addEventListener('balanceUpdated', function(event) {
           <div class="tokenomics-page-hero">
             <div class="tokenomics-hero-content">
               <div class="tokenomics-hero-logo">
-                <img src="image__2_-removebg-preview.png" alt="AccessRewards" class="tokenomics-hero-token-logo">
+                <img src="accessoire-app.png" alt="AccessRewards" class="tokenomics-hero-token-logo">
               </div>
               <div class="tokenomics-network-badge">
 

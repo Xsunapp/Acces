@@ -165,6 +165,18 @@ window.translations = {
     "Chat is currently in development. Full functionality will be available soon!": "Chat is currently in development. Full functionality will be available soon!",
     "Welcome to AccessRewards community chat!": "Welcome to AccessRewards community chat!",
 
+    // Push Notifications
+    "Enable Notifications": "Enable Notifications",
+    "Get notified when you receive ACCESS tokens": "Get notified when you receive ACCESS tokens",
+    "Enable": "Enable",
+    "Notifications enabled successfully!": "Notifications enabled successfully!",
+    "Allow notifications to receive updates": "Allow notifications to receive updates",
+    "We miss you!": "We miss you!",
+    "Your session is ready!": "Your session is ready!",
+    "Welcome back!": "Welcome back!",
+    "You received ACCESS tokens": "You received ACCESS tokens",
+    "New transaction received": "New transaction received",
+
     // More menu items
     "chat": "Chat",
     "withdraw": "Withdraw",
@@ -315,6 +327,19 @@ window.translations = {
     'Yes': 'Oui',
     'No': 'Non',
     'blockchain': 'Network',
+
+    // Push Notifications (French)
+    "Enable Notifications": "Activer les notifications",
+    "Get notified when you receive ACCESS tokens": "Soyez notifié lorsque vous recevez des points ACCESS",
+    "Enable": "Activer",
+    "Notifications enabled successfully!": "Notifications activées avec succès !",
+    "Allow notifications to receive updates": "Autoriser les notifications pour recevoir les mises à jour",
+    "We miss you!": "Vous nous manquez !",
+    "Your session is ready!": "Votre session est prête !",
+    "Welcome back!": "Bienvenue !",
+    "You received ACCESS tokens": "Vous avez reçu des points ACCESS",
+    "New transaction received": "Nouvelle transaction reçue",
+
     home: "Accueil",
 
     // network page translations
@@ -514,6 +539,7 @@ processingTransaction: "Traitement de la transaction en cours...",
   "Watch Ad": "Regarder la pub",
 
     "Ad boost active! Wait for session to end": "Boost publicitaire actif ! Attendez la fin de la session",
+    "Start activity first to watch an ad": "Démarrez une session pour regarder une pub",
 "Boost": "Boost",
 "Processors": "Processeurs",
 "Active": "Actif",
@@ -1033,6 +1059,7 @@ processingTransaction: "Procesando transacción...",
 
 
     "Ad boost active! Wait for session to end": "¡Impulso de anuncio activo! Espera a que termine la sesión",
+    "Start activity first to watch an ad": "Inicia una sesión para ver un anuncio",
 "Boost": "Impulso",
 "Processors": "Procesadores",
 "Active": "Activo",
@@ -1268,7 +1295,20 @@ processingTransaction: "Procesando transacción...",
     "Time": "Hora",
     "Confirmed": "Confirmado",
     "Pending": "Pendiente",
-    "Failed": "Fallido"
+    "Failed": "Fallido",
+    
+    // Push Notification Translations (Spanish)
+    "Enable Notifications": "Activar notificaciones",
+    "Get notified when you receive ACCESS tokens": "Recibe notificaciones cuando recibas puntos ACCESS",
+    "Enable": "Activar",
+    "Maybe Later": "Quizás más tarde",
+    "Notifications enabled successfully!": "¡Notificaciones activadas con éxito!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Las notificaciones están bloqueadas. Por favor, actívalas en la configuración de tu navegador.",
+    "You received ACCESS tokens": "Has recibido puntos ACCESS",
+    "We miss you!": "¡Te extrañamos!",
+    "Your session is ready": "Tu sesión está lista",
+    "From:": "De:",
+    "Amount:": "Cantidad:"
   },
 
   it: {
@@ -1518,6 +1558,7 @@ processingTransaction: "Elaborazione della transazione in corso...",
   "Watch Ad": "Guarda annuncio",
 
     "Ad boost active! Wait for session to end": "Boost pubblicitario attivo! Attendi la fine della sessione",
+    "Start activity first to watch an ad": "Avvia prima un'attività per guardare un annuncio",
 "Boost": "Boost",
 "Processors": "Processori",
 "Active": "Attivo",
@@ -1748,7 +1789,22 @@ processingTransaction: "Elaborazione della transazione in corso...",
     "Time": "Ora",
     "Confirmed": "Confermato",
     "Pending": "In sospeso",
-    "Failed": "Fallito"
+    "Failed": "Fallito",
+
+    // Push Notification Translations (Italian)
+    "Enable Notifications": "Abilita notifiche",
+    "Get notified when you receive ACCESS tokens": "Ricevi notifiche quando ricevi punti ACCESS",
+    "Enable": "Abilita",
+    "Maybe Later": "Forse più tardi",
+    "Notifications enabled successfully!": "Notifiche abilitate con successo!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Le notifiche sono bloccate. Per favore abilitale nelle impostazioni del browser.",
+    "You received ACCESS tokens": "Hai ricevuto punti ACCESS",
+    "We miss you!": "Ci manchi!",
+    "Your session is ready": "La tua sessione è pronta",
+    "From:": "Da:",
+    "Amount:": "Importo:",
+    "New transaction received": "Nuova transazione ricevuta",
+    "Welcome back!": "Bentornato!"
   },
 
   tr: {
@@ -1996,6 +2052,7 @@ processingTransaction: "İşlem işleniyor...",
   "Watch Ad": "Reklam izle",
 
   "Ad boost active! Wait for session to end": "Reklam desteği aktif! Oturumun bitmesini bekleyin",
+  "Start activity first to watch an ad": "Reklam izlemek için önce aktiviteyi başlatın",
 "Boost": "Destek",
 "Processors": "İşlemciler",
 "Active": "Aktif",
@@ -2229,7 +2286,20 @@ processingTransaction: "İşlem işleniyor...",
     "Time": "Saat",
     "Confirmed": "Onaylı",
     "Pending": "Beklemede",
-    "Failed": "Başarısız"
+    "Failed": "Başarısız",
+    
+    // Push Notification Translations (Turkish)
+    "Enable Notifications": "Bildirimleri Etkinleştir",
+    "Get notified when you receive ACCESS tokens": "ACCESS puanları aldığınızda bildirim alın",
+    "Enable": "Etkinleştir",
+    "Maybe Later": "Belki daha sonra",
+    "Notifications enabled successfully!": "Bildirimler başarıyla etkinleştirildi!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Bildirimler engellendi. Lütfen tarayıcı ayarlarından etkinleştirin.",
+    "You received ACCESS tokens": "ACCESS puanları aldınız",
+    "We miss you!": "Sizi özledik!",
+    "Your session is ready": "Oturumunuz hazır",
+    "From:": "Gönderen:",
+    "Amount:": "Miktar:"
   },
 
   hi: {
@@ -2487,6 +2557,7 @@ processingTransaction: "İşlem işleniyor...",
 
 
   "Ad boost active! Wait for session to end": "विज्ञापन बूस्ट सक्रिय है! सत्र समाप्त होने तक प्रतीक्षा करें",
+  "Start activity first to watch an ad": "विज्ञापन देखने के लिए पहले गतिविधि शुरू करें",
 "Boost": "बूस्ट",
 "Processors": "प्रोसेसर",
 "Active": "सक्रिय",
@@ -2719,7 +2790,22 @@ processingTransaction: "İşlem işleniyor...",
     "Time": "समय",
     "Confirmed": "पुष्टि की गई",
     "Pending": "प्रक्रियाधीन",
-    "Failed": "विफल"
+    "Failed": "विफल",
+
+    // Push Notification Translations (Hindi)
+    "Enable Notifications": "सूचनाएं सक्षम करें",
+    "Get notified when you receive ACCESS tokens": "ACCESS अंक प्राप्त करने पर सूचना पाएं",
+    "Enable": "सक्षम करें",
+    "Maybe Later": "शायद बाद में",
+    "Notifications enabled successfully!": "सूचनाएं सफलतापूर्वक सक्षम!",
+    "Notifications are blocked. Please enable them in your browser settings.": "सूचनाएं अवरुद्ध हैं। कृपया ब्राउज़र सेटिंग्स में सक्षम करें।",
+    "You received ACCESS tokens": "आपको ACCESS अंक प्राप्त हुए",
+    "We miss you!": "हम आपको याद करते हैं!",
+    "Your session is ready": "आपका सत्र तैयार है",
+    "From:": "से:",
+    "Amount:": "राशि:",
+    "New transaction received": "नया लेनदेन प्राप्त",
+    "Welcome back!": "वापसी पर स्वागत है!"
   },
 
   zh: {
@@ -2968,6 +3054,7 @@ processingTransaction: "İşlem işleniyor...",
 
 
   "Ad boost active! Wait for session to end": "广告加成已激活！请等待会话结束",
+  "Start activity first to watch an ad": "请先开始活动以观看广告",
 "Boost": "加成",
 "Processors": "处理器",
 "Active": "激活",
@@ -3199,7 +3286,22 @@ processingTransaction: "İşlem işleniyor...",
     "Time": "时间",
     "Confirmed": "已确认",
     "Pending": "待处理",
-    "Failed": "失败"
+    "Failed": "失败",
+
+    // Push Notification Translations (Chinese)
+    "Enable Notifications": "启用通知",
+    "Get notified when you receive ACCESS tokens": "收到 ACCESS 积分时获得通知",
+    "Enable": "启用",
+    "Maybe Later": "稍后再说",
+    "Notifications enabled successfully!": "通知已成功启用！",
+    "Notifications are blocked. Please enable them in your browser settings.": "通知被阻止。请在浏览器设置中启用。",
+    "You received ACCESS tokens": "您收到了 ACCESS 积分",
+    "We miss you!": "我们想念您！",
+    "Your session is ready": "您的会话已准备就绪",
+    "From:": "来自：",
+    "Amount:": "金额：",
+    "New transaction received": "收到新交易",
+    "Welcome back!": "欢迎回来！"
   },
 
   ja: {
@@ -3469,6 +3571,7 @@ processingTransaction: "İşlem işleniyor...",
   "Watch Ad": "広告を見る",
 
   "Ad boost active! Wait for session to end": "広告ブースト有効！セッション終了までお待ちください",
+  "Start activity first to watch an ad": "広告を見るにはまずアクティビティを開始してください",
 "Boost": "ブースト",
 "Processors": "プロセッサ",
 "Active": "有効",
@@ -3694,7 +3797,22 @@ processingTransaction: "İşlem işleniyor...",
     "Time": "時間",
     "Confirmed": "承認済み",
     "Pending": "保留中",
-    "Failed": "失敗"
+    "Failed": "失敗",
+
+    // Push Notification Translations (Japanese)
+    "Enable Notifications": "通知を有効にする",
+    "Get notified when you receive ACCESS tokens": "ACCESS ポイントを受け取ったときに通知を受け取る",
+    "Enable": "有効にする",
+    "Maybe Later": "後で",
+    "Notifications enabled successfully!": "通知が正常に有効になりました！",
+    "Notifications are blocked. Please enable them in your browser settings.": "通知がブロックされています。ブラウザの設定で有効にしてください。",
+    "You received ACCESS tokens": "ACCESS ポイントを受け取りました",
+    "We miss you!": "お待ちしております！",
+    "Your session is ready": "セッションの準備ができました",
+    "From:": "送信元：",
+    "Amount:": "金額：",
+    "New transaction received": "新しい取引を受信",
+    "Welcome back!": "おかえりなさい！"
   },
 
   ko: {
@@ -3953,6 +4071,7 @@ processingTransaction: "İşlem işleniyor...",
 
 
   "Ad boost active! Wait for session to end": "광고 부스트가 활성화되었습니다! 세션이 끝날 때까지 기다리세요",
+  "Start activity first to watch an ad": "광고를 보려면 먼저 활동을 시작하세요",
 "Boost": "부스트",
 "Processors": "프로세서",
 "Active": "활성",
@@ -4191,7 +4310,22 @@ processingTransaction: "İşlem işleniyor...",
     "Block height": "블록 높이",
     "Block hash": "블록 해시",
     "Block time": "블록 시간",
-    "Transaction fee": "거래 수수료"
+    "Transaction fee": "거래 수수료",
+
+    // Push Notification Translations (Korean)
+    "Enable Notifications": "알림 활성화",
+    "Get notified when you receive ACCESS tokens": "ACCESS 포인트를 받으면 알림을 받으세요",
+    "Enable": "활성화",
+    "Maybe Later": "나중에",
+    "Notifications enabled successfully!": "알림이 성공적으로 활성화되었습니다!",
+    "Notifications are blocked. Please enable them in your browser settings.": "알림이 차단되었습니다. 브라우저 설정에서 활성화해 주세요.",
+    "You received ACCESS tokens": "ACCESS 포인트를 받았습니다",
+    "We miss you!": "보고 싶어요!",
+    "Your session is ready": "세션이 준비되었습니다",
+    "From:": "보낸 사람:",
+    "Amount:": "금액:",
+    "New transaction received": "새 거래 수신",
+    "Welcome back!": "다시 오신 것을 환영합니다!"
   },
 
   pt: {
@@ -4442,6 +4576,7 @@ processingTransaction: "İşlem işleniyor...",
   "Watch Ad": "Assistir anúncio",
 
   "Ad boost active! Wait for session to end": "Impulso de anúncio ativo! Aguarde o término da sessão",
+  "Start activity first to watch an ad": "Inicie uma atividade primeiro para assistir um anúncio",
 "Boost": "Impulso",
 "Processors": "Processadores",
 "Active": "Ativo",
@@ -4677,7 +4812,22 @@ processingTransaction: "İşlem işleniyor...",
     "Time": "Hora",
     "Confirmed": "Confirmado",
     "Pending": "Pendente",
-    "Failed": "Falhou"
+    "Failed": "Falhou",
+
+    // Push Notification Translations (Portuguese)
+    "Enable Notifications": "Ativar notificações",
+    "Get notified when you receive ACCESS tokens": "Receba notificações quando receber pontos ACCESS",
+    "Enable": "Ativar",
+    "Maybe Later": "Talvez mais tarde",
+    "Notifications enabled successfully!": "Notificações ativadas com sucesso!",
+    "Notifications are blocked. Please enable them in your browser settings.": "As notificações estão bloqueadas. Por favor, ative-as nas configurações do navegador.",
+    "You received ACCESS tokens": "Você recebeu pontos ACCESS",
+    "We miss you!": "Sentimos sua falta!",
+    "Your session is ready": "Sua sessão está pronta",
+    "From:": "De:",
+    "Amount:": "Valor:",
+    "New transaction received": "Nova transação recebida",
+    "Welcome back!": "Bem-vindo de volta!"
   },
 
   ru: {
@@ -4931,6 +5081,7 @@ insufficientBalance: "Недостаточно средств для этой т
 
 
   "Ad boost active! Wait for session to end": "Рекламный бонус активен! Дождитесь окончания сессии",
+  "Start activity first to watch an ad": "Сначала начните активность, чтобы посмотреть рекламу",
 "Boost": "Буст",
 "Processors": "Процессоры",
 "Active": "Активен",
@@ -5172,7 +5323,22 @@ insufficientBalance: "Недостаточно средств для этой т
     "Block height": "Высота блока",
     "Block hash": "Хэш блока",
     "Block time": "Время блока",
-    "Transaction fee": "Комиссия за транзакцию"
+    "Transaction fee": "Комиссия за транзакцию",
+
+    // Push Notification Translations (Russian)
+    "Enable Notifications": "Включить уведомления",
+    "Get notified when you receive ACCESS tokens": "Получайте уведомления при получении баллов ACCESS",
+    "Enable": "Включить",
+    "Maybe Later": "Может быть позже",
+    "Notifications enabled successfully!": "Уведомления успешно включены!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Уведомления заблокированы. Пожалуйста, включите их в настройках браузера.",
+    "You received ACCESS tokens": "Вы получили баллы ACCESS",
+    "We miss you!": "Мы скучаем по вам!",
+    "Your session is ready": "Ваша сессия готова",
+    "From:": "От:",
+    "Amount:": "Сумма:",
+    "New transaction received": "Получена новая транзакция",
+    "Welcome back!": "С возвращением!"
   },
 
   de: {
@@ -5675,7 +5841,20 @@ insufficientBalance: "Недостаточно средств для этой т
     "Time": "Zeit",
     "Confirmed": "Bestätigt",
     "Pending": "Ausstehend",
-    "Failed": "Fehlgeschlagen"
+    "Failed": "Fehlgeschlagen",
+    
+    // Push Notification Translations (German)
+    "Enable Notifications": "Benachrichtigungen aktivieren",
+    "Get notified when you receive ACCESS tokens": "Erhalten Sie Benachrichtigungen, wenn Sie ACCESS-Punkte erhalten",
+    "Enable": "Aktivieren",
+    "Maybe Later": "Vielleicht später",
+    "Notifications enabled successfully!": "Benachrichtigungen erfolgreich aktiviert!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Benachrichtigungen sind blockiert. Bitte aktivieren Sie sie in Ihren Browsereinstellungen.",
+    "You received ACCESS tokens": "Sie haben ACCESS-Punkte erhalten",
+    "We miss you!": "Wir vermissen Sie!",
+    "Your session is ready": "Ihre Sitzung ist bereit",
+    "From:": "Von:",
+    "Amount:": "Betrag:"
   },
 
   ar: {
@@ -5755,6 +5934,18 @@ insufficientBalance: "Недостаточно средств для этой т
     'Are you sure you want to sign out?': 'هل أنت متأكد أنك تريد تسجيل الخروج؟',
     'Yes': 'نعم',
     'No': 'لا',
+
+    // Push Notifications (Arabic)
+    "Enable Notifications": "تفعيل الإشعارات",
+    "Get notified when you receive ACCESS tokens": "احصل على إشعار عند استلام نقاط ACCESS",
+    "Enable": "تفعيل",
+    "Notifications enabled successfully!": "تم تفعيل الإشعارات بنجاح!",
+    "Allow notifications to receive updates": "السماح بالإشعارات لتلقي التحديثات",
+    "We miss you!": "نفتقدك!",
+    "Your session is ready!": "جلستك جاهزة!",
+    "Welcome back!": "مرحباً بعودتك!",
+    "You received ACCESS tokens": "لقد استلمت نقاط ACCESS",
+    "New transaction received": "تم استلام معاملة جديدة",
     
     
     home: "الرئيسية",
@@ -5943,6 +6134,7 @@ insufficientBalance: "Недостаточно средств для этой т
 "before watching another ad": "قبل مشاهدة إعلان آخر",
 "Watch Ad": "شاهد إعلان",
 "Ad boost active! Wait for session to end": "تعزيز الإعلان نشط! انتظر حتى تنتهي الجلسة",
+"Start activity first to watch an ad": "ابدأ جلسة أولاً لمشاهدة إعلان",
 
     "Boost": "تعزيز",
     "Processors": "المعالجات",
@@ -6478,10 +6670,11 @@ insufficientBalance: "Недостаточно средств для этой т
   "before watching another ad": "sebelum menonton iklan lainnya",
   "Watch Ad": "Tonton iklan",
 
-    "Ad boost active! Wait for session to end": "Bonus reklamowy aktywny! Poczekaj na zakończenie sesji",
-"Boost": "Wzmocnienie",
-"Processors": "Procesory",
-"Active": "Aktywny",
+    "Ad boost active! Wait for session to end": "Boost iklan aktif! Tunggu hingga sesi selesai",
+    "Start activity first to watch an ad": "Mulai aktivitas terlebih dahulu untuk menonton iklan",
+"Boost": "Boost",
+"Processors": "Prosesor",
+"Active": "Aktif",
 
 
   // leaderboard
@@ -6728,7 +6921,22 @@ insufficientBalance: "Недостаточно средств для этой т
     "Block height": "Tinggi blok",
     "Block hash": "Hash blok",
     "Block time": "Waktu blok",
-    "Transaction fee": "Biaya transaksi"
+    "Transaction fee": "Biaya transaksi",
+
+    // Push Notification Translations (Indonesian)
+    "Enable Notifications": "Aktifkan Notifikasi",
+    "Get notified when you receive ACCESS tokens": "Dapatkan notifikasi saat Anda menerima poin ACCESS",
+    "Enable": "Aktifkan",
+    "Maybe Later": "Mungkin nanti",
+    "Notifications enabled successfully!": "Notifikasi berhasil diaktifkan!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Notifikasi diblokir. Harap aktifkan di pengaturan browser.",
+    "You received ACCESS tokens": "Anda menerima poin ACCESS",
+    "We miss you!": "Kami rindu Anda!",
+    "Your session is ready": "Sesi Anda siap",
+    "From:": "Dari:",
+    "Amount:": "Jumlah:",
+    "New transaction received": "Transaksi baru diterima",
+    "Welcome back!": "Selamat datang kembali!"
   },
 
   pl: {
@@ -6988,6 +7196,7 @@ insufficientBalance: "Недостаточно средств для этой т
 
 
     "Ad boost active! Wait for session to end": "Bonus reklamowy aktywny! Poczekaj na zakończenie sesji",
+    "Start activity first to watch an ad": "Najpierw rozpocznij aktywność, aby obejrzeć reklamę",
     "Boost": "Wzmocnienie",
     "Processors": "Procesory",
     "Active": "Aktywny",
@@ -7222,6 +7431,21 @@ insufficientBalance: "Недостаточно средств для этой т
     "Time": "Czas",
     "Confirmed": "Potwierdzona",
     "Pending": "Oczekująca",
-    "Failed": "Nieudana"
+    "Failed": "Nieudana",
+
+    // Push Notification Translations (Polish)
+    "Enable Notifications": "Włącz powiadomienia",
+    "Get notified when you receive ACCESS tokens": "Otrzymuj powiadomienia gdy otrzymasz punkty ACCESS",
+    "Enable": "Włącz",
+    "Maybe Later": "Może później",
+    "Notifications enabled successfully!": "Powiadomienia włączone pomyślnie!",
+    "Notifications are blocked. Please enable them in your browser settings.": "Powiadomienia są zablokowane. Proszę włączyć je w ustawieniach przeglądarki.",
+    "You received ACCESS tokens": "Otrzymałeś punkty ACCESS",
+    "We miss you!": "Tęsknimy za Tobą!",
+    "Your session is ready": "Twoja sesja jest gotowa",
+    "From:": "Od:",
+    "Amount:": "Kwota:",
+    "New transaction received": "Otrzymano nową transakcję",
+    "Welcome back!": "Witaj ponownie!"
   }
 };

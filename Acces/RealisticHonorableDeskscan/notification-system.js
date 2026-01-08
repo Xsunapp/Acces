@@ -1,6 +1,113 @@
 // Push Notification System for ACCESS Network
 // Sends push notifications when user receives ACCESS tokens
 
+// Transaction notification translations
+const NOTIFICATION_TRANSLATIONS = {
+  en: {
+    newTransaction: 'New transaction received',
+    receivedTitle: 'Received ACCESS',
+    fromLabel: 'From',
+    amountLabel: 'Amount'
+  },
+  ar: {
+    newTransaction: 'تم استلام معاملة جديدة',
+    receivedTitle: 'استلمت ACCESS',
+    fromLabel: 'من',
+    amountLabel: 'المبلغ'
+  },
+  fr: {
+    newTransaction: 'Nouvelle transaction reçue',
+    receivedTitle: 'ACCESS reçu',
+    fromLabel: 'De',
+    amountLabel: 'Montant'
+  },
+  de: {
+    newTransaction: 'Neue Transaktion erhalten',
+    receivedTitle: 'ACCESS erhalten',
+    fromLabel: 'Von',
+    amountLabel: 'Betrag'
+  },
+  es: {
+    newTransaction: 'Nueva transacción recibida',
+    receivedTitle: 'ACCESS recibido',
+    fromLabel: 'De',
+    amountLabel: 'Cantidad'
+  },
+  tr: {
+    newTransaction: 'Yeni işlem alındı',
+    receivedTitle: 'ACCESS alındı',
+    fromLabel: 'Gönderen',
+    amountLabel: 'Miktar'
+  },
+  ru: {
+    newTransaction: 'Получена новая транзакция',
+    receivedTitle: 'Получено ACCESS',
+    fromLabel: 'От',
+    amountLabel: 'Сумма'
+  },
+  zh: {
+    newTransaction: '收到新交易',
+    receivedTitle: '收到 ACCESS',
+    fromLabel: '来自',
+    amountLabel: '金额'
+  },
+  ja: {
+    newTransaction: '新しい取引を受信しました',
+    receivedTitle: 'ACCESS受信',
+    fromLabel: '送信元',
+    amountLabel: '金額'
+  },
+  ko: {
+    newTransaction: '새 거래가 수신되었습니다',
+    receivedTitle: 'ACCESS 수신',
+    fromLabel: '발신',
+    amountLabel: '금액'
+  },
+  pt: {
+    newTransaction: 'Nova transação recebida',
+    receivedTitle: 'ACCESS recebido',
+    fromLabel: 'De',
+    amountLabel: 'Quantia'
+  },
+  hi: {
+    newTransaction: 'नया लेनदेन प्राप्त हुआ',
+    receivedTitle: 'ACCESS प्राप्त',
+    fromLabel: 'से',
+    amountLabel: 'राशि'
+  },
+  it: {
+    newTransaction: 'Nuova transazione ricevuta',
+    receivedTitle: 'ACCESS ricevuto',
+    fromLabel: 'Da',
+    amountLabel: 'Importo'
+  },
+  id: {
+    newTransaction: 'Transaksi baru diterima',
+    receivedTitle: 'ACCESS diterima',
+    fromLabel: 'Dari',
+    amountLabel: 'Jumlah'
+  },
+  pl: {
+    newTransaction: 'Otrzymano nową transakcję',
+    receivedTitle: 'Otrzymano ACCESS',
+    fromLabel: 'Od',
+    amountLabel: 'Kwota'
+  }
+};
+
+// Get device language
+function getDeviceLanguage() {
+  const lang = navigator.language || navigator.userLanguage || 'en';
+  return lang.slice(0, 2).toLowerCase();
+}
+
+// Get translation for current language
+function getNotificationText(key) {
+  const lang = getDeviceLanguage();
+  const texts = NOTIFICATION_TRANSLATIONS[lang] || NOTIFICATION_TRANSLATIONS['en'];
+  return texts[key] || NOTIFICATION_TRANSLATIONS['en'][key];
+}
+
 class AccessNotificationSystem {
   constructor() {
     this.isSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -38,15 +145,60 @@ class AccessNotificationSystem {
       // Connect to WebSocket for real-time transaction updates
       this.connectWebSocket();
 
-      // Subscribe to Web Push notifications for background delivery
+      // 🔔 FACEBOOK/INSTAGRAM STYLE: إعادة الاشتراك التلقائية
+      // إذا كان الإذن ممنوح سابقاً، نعيد الاشتراك تلقائياً كل مرة
       if (this.permission === 'granted') {
-        await this.subscribeToWebPush();
+        await this.autoResubscribe();
       }
       
       return true;
     } catch (error) {
       console.error('Service Worker registration failed:', error);
       return false;
+    }
+  }
+
+  // 🔔 FACEBOOK/INSTAGRAM STYLE: إعادة الاشتراك التلقائية الذكية
+  async autoResubscribe() {
+    try {
+      if (!this.registration || !this.userId) {
+        this.getUserWalletAddress();
+      }
+
+      // التحقق من الاشتراك الحالي
+      const currentSub = await this.registration?.pushManager?.getSubscription();
+      
+      if (currentSub) {
+        // اختبار صلاحية الاشتراك عبر السيرفر
+        const testResponse = await fetch('/api/push/test-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: this.userId,
+            endpoint: currentSub.endpoint
+          })
+        });
+        
+        const testResult = await testResponse.json();
+        
+        if (testResult.valid) {
+          console.log('✅ Push subscription is still valid');
+          this.pushSubscription = currentSub;
+          return true;
+        }
+        
+        console.log('⚠️ Push subscription expired/invalid, auto-resubscribing...');
+      }
+
+      // إعادة الاشتراك تلقائياً
+      await this.subscribeToWebPush();
+      console.log('🔔 Auto-resubscribed to push notifications (Facebook/Instagram style)');
+      return true;
+      
+    } catch (error) {
+      console.error('Auto-resubscribe error:', error);
+      // محاولة الاشتراك العادي كـ fallback
+      return await this.subscribeToWebPush();
     }
   }
 
@@ -318,13 +470,16 @@ class AccessNotificationSystem {
       const from = txData.from || 'Unknown';
       const fromShort = from.length > 10 ? `${from.substring(0, 6)}...${from.substring(from.length - 4)}` : from;
       
-      const title = 'Received ACCESS';
-      const body = `From: ${fromShort}\nAmount: ${amount} ACCESS`;
+      // Get translated notification text
+      const title = 'Access Network';
+      const fromLabel = getNotificationText('fromLabel');
+      const amountLabel = getNotificationText('amountLabel');
+      const newTxText = getNotificationText('newTransaction') || 'New transaction received';
+      const body = `${newTxText}\n${amountLabel}: ${amount} ACCESS\n${fromLabel}: ${fromShort}`;
 
       const options = {
         body: body,
         icon: '/access-logo-1ipfs.png',
-        badge: '/access-logo-1ipfs.png',
         image: '/access-logo-1ipfs.png',
         vibrate: [200, 100, 200, 100, 200],
         tag: `access-tx-${txData.hash || Date.now()}`,
@@ -334,6 +489,7 @@ class AccessNotificationSystem {
           hash: txData.hash,
           amount: amount,
           from: from,
+          language: getDeviceLanguage(),
           timestamp: Date.now()
         }
       };

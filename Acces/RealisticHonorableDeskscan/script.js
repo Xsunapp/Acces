@@ -69,7 +69,7 @@ async function registerPushNotifications(userId) {
     
     if (!subscription) {
       // Subscribe to push notifications with current VAPID key
-      const vapidPublicKey = 'BPRQALkVxvlQs5QS5Iu53dSFiddGJ6Zuhqo7hgQGkoATj_MUnZCdn0KtkIInV1J_9lD6H1UMZH1WHbGRHokXdZA';
+      const vapidPublicKey = 'BNj9ssedNiYUBqmqwJndFQHPZKBEWuFmtZYX9HBm0VdOgFWltE6jbgyIN1wfgSO-i_zoMq4Dmr7VBw3aQpx7cVI';
       
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -94,6 +94,38 @@ async function registerPushNotifications(userId) {
     console.log('🔔 Push subscription saved to server');
   } catch (error) {
     console.error('❌ Push notification registration failed:', error);
+  }
+}
+
+// 🔔 TWA/PWA: طلب إذن الإشعارات (مهم جداً لتطبيق Android)
+async function requestNotificationPermission(userId) {
+  try {
+    if (!('Notification' in window)) {
+      console.warn('Notifications not supported');
+      return false;
+    }
+
+    // التحقق من الإذن الحالي
+    let permission = Notification.permission;
+    
+    // إذا كان الإذن "default" (لم يتم السؤال بعد)، نطلب الإذن
+    if (permission === 'default') {
+      console.log('🔔 Requesting notification permission...');
+      permission = await Notification.requestPermission();
+    }
+
+    if (permission === 'granted') {
+      console.log('✅ Notification permission granted');
+      // تسجيل الإشعارات
+      await registerPushNotifications(userId);
+      return true;
+    } else {
+      console.log('❌ Notification permission denied:', permission);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+    return false;
   }
 }
 
@@ -1337,6 +1369,35 @@ For more information, visit our platform at: ${window.location.origin}
     }
   }
 
+  // Save language preference to database for push notification localization
+  async function saveLanguageToDatabase(langCode) {
+    if (!currentUser || !currentUser.id) {
+      console.log('Cannot save language to DB: No user logged in');
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/users/update-profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          language: langCode
+        })
+      });
+      
+      if (response.ok) {
+        console.log(`Language ${langCode} saved to database for user ${currentUser.id}`);
+      } else {
+        console.warn('Failed to save language to database');
+      }
+    } catch (error) {
+      console.error('Error saving language to database:', error);
+    }
+  }
+
   function closeLanguageModal() {
     const modal = document.getElementById('languageModal');
     if (modal) {
@@ -1352,6 +1413,11 @@ For more information, visit our platform at: ${window.location.origin}
     
     // Save preference immediately
     localStorage.setItem('preferredLanguage', langCode);
+    
+    // Save language to database for push notifications localization
+    if (currentUser && currentUser.id) {
+      saveLanguageToDatabase(langCode);
+    }
     
     // Update dashboard language code display immediately
     const dashboardLanguageCode = document.getElementById('dashboard-language-code');
@@ -1510,15 +1576,20 @@ For more information, visit our platform at: ${window.location.origin}
         if (copyBtn) {
           const icon = copyBtn.querySelector('i');
           if (icon) {
-            const originalClass = icon.className;
+            // Clear any existing timeout
+            if (copyBtn._resetTimeout) {
+              clearTimeout(copyBtn._resetTimeout);
+            }
+            
             icon.className = 'fas fa-check';
             copyBtn.style.color = '#10b981';
             copyBtn.style.transform = 'scale(1.1)';
             
-            setTimeout(() => {
-              icon.className = originalClass;
+            copyBtn._resetTimeout = setTimeout(() => {
+              icon.className = 'fas fa-copy';
               copyBtn.style.color = '';
               copyBtn.style.transform = '';
+              copyBtn._resetTimeout = null;
             }, 2000);
           }
         }
@@ -6629,10 +6700,11 @@ window.addEventListener('load', applyArabicCssIfNeeded);
           // Connect to WebSocket for presence tracking
           connectPresenceWebSocket(currentUser.id);
           
-          // 🔔 SUBSCRIBE TO PUSH NOTIFICATIONS
-          if ('serviceWorker' in navigator && 'PushManager' in window && Notification.permission === 'granted') {
-            registerPushNotifications(currentUser.id);
+          // 🔔 طلب إذن الإشعارات للتطبيق (TWA/PWA) - نافذة النظام العادية
+          if ('Notification' in window && Notification.permission === 'default') {
+            requestNotificationPermission(currentUser.id);
           }
+          
           // Load processing history when restoring session
           addProcessingHistoryEntry();
           
@@ -8671,14 +8743,28 @@ window.copyAccountAddress = function() {
   if (walletAddress && walletAddress.textContent !== translator.translate("")) {
     navigator.clipboard.writeText(walletAddress.textContent)
       .then(() => {
-        // Update button to show it was copied
-        const originalHTML = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+        // Remove focus from button to prevent blue background
+        copyBtn.blur();
+        
+        // Get the icon element
+        const icon = copyBtn.querySelector('i');
+        if (icon) {
+          // Show check icon
+          icon.className = 'fas fa-check';
+          copyBtn.classList.add('copied');
 
-        // Reset button after 2 seconds
-        setTimeout(() => {
-          copyBtn.innerHTML = originalHTML;
-        }, 2000);
+          // Clear any existing timeout
+          if (copyBtn._resetTimeout) {
+            clearTimeout(copyBtn._resetTimeout);
+          }
+
+          // Reset button after 2 seconds
+          copyBtn._resetTimeout = setTimeout(() => {
+            icon.className = 'fas fa-copy';
+            copyBtn.classList.remove('copied');
+            copyBtn._resetTimeout = null;
+          }, 2000);
+        }
 
         // Show notification
         showNotification(translator.translate('Wallet address copied to clipboard'), 'success');
@@ -10378,8 +10464,10 @@ if (totalCost > (currentBalance + precision)) {
       const totalBlocksElement = document.getElementById('total-blocks');
       const totalTransactionsElement = document.getElementById('total-transactions');
 
-      if (totalBlocksElement) totalBlocksElement.textContent = Math.floor(transactions.length / 10) + 1;
-      if (totalTransactionsElement) totalTransactionsElement.textContent = transactions.length;
+      // Use totalCount from API if available, otherwise use transactions length
+      const totalTxCount = data.totalCount || transactions.length;
+      if (totalBlocksElement) totalBlocksElement.textContent = Math.floor(totalTxCount / 10) + 1;
+      if (totalTransactionsElement) totalTransactionsElement.textContent = totalTxCount;
 
     } catch (error) {
       console.error("Failed to fetch transactions:", error);
@@ -10825,6 +10913,11 @@ if (totalCost > (currentBalance + precision)) {
         connectPresenceWebSocket(currentUser.id);
         // Load processing history when restoring session
         addProcessingHistoryEntry();
+        
+        // 🔔 طلب إذن الإشعارات للتطبيق (TWA/PWA) - نافذة النظام العادية
+        if ('Notification' in window && Notification.permission === 'default') {
+          requestNotificationPermission(currentUser.id);
+        }
       }
 
       // Process login with DB integration

@@ -10,6 +10,7 @@ import ultraCache from './ultra-cache-system.js';
 import WebSocketRPCHandler from './websocket-rpc-handler.js';
 import { getGlobalAccessStateStorage } from './access-state-storage.js';
 import webpush from 'web-push';
+import { startReEngagementScheduler } from './re-engagement-notifications.js';
 
 // 🏗️ Enterprise Distributed Infrastructure - للتوسع لملايين المستخدمين
 import enterpriseInfra from './enterprise-infrastructure.js';
@@ -607,6 +608,9 @@ global.sendWebPushNotificationToRecipient = sendWebPushNotificationToRecipient;
                     console.error('Error in initial sync:', syncError);
                   }
                 }, 30000); // 30 seconds after startup
+
+                // 📬 Start Re-Engagement Notification System
+                startReEngagementScheduler();
 
               } catch (networkError) {
                 console.error('Warning: Network initialization failed:', networkError);
@@ -3638,6 +3642,13 @@ const server = http.createServer(async (req, res) => {
         const userId = parseInt(pathname.split('/')[3]);
         console.log(`Retrieving transactions for user ID: ${userId}`);
 
+        // Get total count first
+        const countResult = await pool.query(
+          `SELECT COUNT(*) as total FROM transactions t WHERE t.sender = $1 OR t.recipient = $1`,
+          [userId]
+        );
+        const totalCount = parseInt(countResult.rows[0]?.total) || 0;
+
         // Get all transactions for this user from the database
         const transactionsResult = await pool.query(
           `SELECT t.*, 
@@ -3646,8 +3657,7 @@ const server = http.createServer(async (req, res) => {
                       ELSE 'unknown' END as direction
            FROM transactions t
            WHERE t.sender = $1 OR t.recipient = $1
-           ORDER BY t.timestamp DESC
-           LIMIT 100`,
+           ORDER BY t.timestamp DESC`,
           [userId]
         );
 
@@ -3679,12 +3689,13 @@ const server = http.createServer(async (req, res) => {
           };
         });
 
-        console.log(`Retrieved ${transactions.length} transactions for user ${userId}`);
+        console.log(`Retrieved ${transactions.length} transactions for user ${userId} (total: ${totalCount})`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
           success: true, 
-          transactions: transactions
+          transactions: transactions,
+          totalCount: totalCount
         }));
       } catch (error) {
         console.error('Error getting user transactions:', error);
@@ -3716,6 +3727,13 @@ const server = http.createServer(async (req, res) => {
         // توحيد العنوان
         const normalizedAddress = address.toLowerCase();
 
+        // Get total count first
+        const countResult = await pool.query(
+          `SELECT COUNT(*) as total FROM transactions t WHERE LOWER(t.sender_address) = $1 OR LOWER(t.recipient_address) = $1`,
+          [normalizedAddress]
+        );
+        const totalCount = parseInt(countResult.rows[0]?.total) || 0;
+
         // البحث عن جميع المعاملات لهذا العنوان (الواردة والصادرة)
         const transactionsResult = await pool.query(
           `SELECT t.*, 
@@ -3731,8 +3749,7 @@ const server = http.createServer(async (req, res) => {
                   END as transaction_type
            FROM transactions t
            WHERE LOWER(t.sender_address) = $1 OR LOWER(t.recipient_address) = $1
-           ORDER BY t.timestamp DESC
-           LIMIT 100`,
+           ORDER BY t.timestamp DESC`,
           [normalizedAddress]
         );
 
@@ -3762,14 +3779,15 @@ const server = http.createServer(async (req, res) => {
           };
         });
 
-        console.log(`Retrieved ${transactions.length} transactions for wallet ${address}`);
+        console.log(`Retrieved ${transactions.length} transactions for wallet ${address} (total: ${totalCount})`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
           success: true, 
           transactions: transactions,
           wallet_address: address,
-          transaction_count: transactions.length
+          transaction_count: transactions.length,
+          totalCount: totalCount
         }));
       } catch (error) {
         console.error('Error getting wallet transactions:', error);
@@ -3812,8 +3830,7 @@ const server = http.createServer(async (req, res) => {
           FROM transactions 
           WHERE LOWER(recipient_address) = $1 
           AND status = 'confirmed'
-          ORDER BY timestamp DESC 
-          LIMIT 100
+          ORDER BY timestamp DESC
         `, [normalizedAddress]);
 
         // تنسيق المعاملات للمحافظ الخارجية
@@ -3988,8 +4005,7 @@ const server = http.createServer(async (req, res) => {
                WHERE (t.sender = $1 OR t.recipient = $1 OR 
                       LOWER(t.sender_address) = LOWER($2) OR 
                       LOWER(t.recipient_address) = LOWER($2))
-               ORDER BY t.timestamp DESC
-               LIMIT 100`,
+               ORDER BY t.timestamp DESC`,
               [userId, userWalletAddress]
             );
           } else {
@@ -4003,8 +4019,7 @@ const server = http.createServer(async (req, res) => {
                       END as direction
                FROM transactions t
                WHERE t.sender = $1 OR t.recipient = $1
-               ORDER BY t.timestamp DESC
-               LIMIT 100`,
+               ORDER BY t.timestamp DESC`,
               [userId]
             );
           }
@@ -4022,8 +4037,7 @@ const server = http.createServer(async (req, res) => {
                       END as direction
                FROM transactions t
                WHERE (t.sender = $1 OR t.recipient = $1) AND t.sender IS NOT NULL AND t.recipient IS NOT NULL
-               ORDER BY t.timestamp DESC
-               LIMIT 100`,
+               ORDER BY t.timestamp DESC`,
               [userId]
             );
           } catch (fallbackError) {
@@ -5826,8 +5840,7 @@ const server = http.createServer(async (req, res) => {
                       ELSE 'unknown' END as direction
            FROM transactions t
            WHERE t.sender = $1::text OR t.recipient = $1::text OR t.sender = $2::integer OR t.recipient = $2::integer
-           ORDER BY t.timestamp DESC
-           LIMIT 100`,
+           ORDER BY t.timestamp DESC`,
           [userIdNumber.toString(), userIdNumber]
         );
 

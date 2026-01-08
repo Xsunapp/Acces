@@ -122,6 +122,56 @@ class NetworkNode {
     // إنشاء جداول المحافظ الخارجية
     this.createWalletTables();
 
+    // 🔄 تنظيف الحجوزات القديمة عند بدء السيرفر
+    if (this.blockchain.resetAllReservations) {
+      this.blockchain.resetAllReservations();
+    }
+
+    // 🔥 ETHEREUM-STYLE: تهيئة virtual block offset للمزامنة الفورية
+    this.virtualBlockOffset = 0;
+    this.lastBalanceChange = Date.now();
+    this.pendingBalanceAddresses = new Set(); // عناوين تحتاج تحديث فوري
+
+    // 🔥 METAMASK-STYLE: نظام تتبع المعاملات المؤكدة (مثل AccountTrackerController في MetaMask)
+    // عند تأكيد معاملة، يتم تحديث الرصيد فوراً بدون انتظار polling
+    this.confirmedTransactionTracker = new Map(); // txHash -> {from, to, timestamp}
+    this.recentlyConfirmedAddresses = new Map(); // address -> {balance, timestamp}
+    
+    // ⚡ ULTRA-AGGRESSIVE SYNC: زيادة virtual block كل 50ms (20x في الثانية) - مثل Ethereum mainnet
+    setInterval(() => {
+      // زيادة أكبر عند وجود عناوين معلقة
+      const pendingMultiplier = Math.max(1, this.pendingBalanceAddresses?.size || 0);
+      if (Date.now() - this.lastBalanceChange < 60000) {
+        this.virtualBlockOffset += (10 * pendingMultiplier); // زيادة أكبر لإجبار التحديث
+      }
+    }, 50);
+
+    // ⚡ INSTANT SYNC: بث newHeads كل 250ms (4x في الثانية) لتحديث المحافظ
+    setInterval(() => {
+      if (this.pendingBalanceAddresses.size > 0 || Date.now() - this.lastBalanceChange < 60000) {
+        this.broadcastPeriodicNewHeads();
+        // مسح العناوين المعلقة بعد 5 ثوانٍ فقط
+        if (Date.now() - this.lastBalanceChange > 5000) {
+          this.pendingBalanceAddresses.clear();
+        }
+      }
+    }, 250);
+    
+    // ⚡ METAMASK-STYLE: تنظيف المعاملات المؤكدة القديمة كل دقيقة
+    setInterval(() => {
+      const now = Date.now();
+      for (const [hash, data] of this.confirmedTransactionTracker.entries()) {
+        if (now - data.timestamp > 300000) { // 5 دقائق
+          this.confirmedTransactionTracker.delete(hash);
+        }
+      }
+      for (const [address, data] of this.recentlyConfirmedAddresses.entries()) {
+        if (now - data.timestamp > 60000) { // 1 دقيقة
+          this.recentlyConfirmedAddresses.delete(address);
+        }
+      }
+    }, 60000);
+
     // Node initialization messages silenced to reduce console spam
 
     // بدء مزامنة تلقائية للأرصدة عند التهيئة
@@ -129,7 +179,6 @@ class NetworkNode {
       this.syncAllWalletBalances();
     }, 5000); // انتظار 5 ثوانِ ثم بدء المزامنة
   }
-
   // تهيئة نظام التخزين المتقدم
   async initializeAdvancedStorage() {
     try {
@@ -233,11 +282,248 @@ class NetworkNode {
     // 🔔 INSTANT BALANCE NOTIFICATIONS - مثل Ethereum
     this.blockchain.on('balanceChanged', (data) => {
       try {
+        // 🔥 تسجيل وقت آخر تغيير في الرصيد
+        this.lastBalanceChange = Date.now();
+        this.virtualBlockOffset++;
+        
+        console.log(`🔥 BALANCE CHANGED: ${data.address.slice(0, 10)}... → ${data.newBalance.toFixed(8)} ACCESS`);
+        
         this.broadcastInstantBalanceUpdate(data.address, data.newBalance);
+        
+        // 🔥 ETHEREUM-STYLE: بث newHeads لإجبار المحافظ على إعادة الاستعلام
+        // هذه هي الطريقة التي تستخدمها Ethereum و BSC
+        this.broadcastNewHeadsForBalanceUpdate(data.address);
       } catch (error) {
         console.error('Error broadcasting balance change:', error);
       }
     });
+  }
+
+  // 🔥 بث newHeads مزيف عند تغيير الرصيد (يجبر المحافظ على eth_getBalance)
+  broadcastNewHeadsForBalanceUpdate(changedAddress) {
+    try {
+      const fakeBlockNumber = this.blockchain.chain?.length || 1;
+      const fakeBlockHash = '0x' + Date.now().toString(16).padStart(64, '0');
+      
+      const newHeadsNotification = {
+        jsonrpc: '2.0',
+        method: 'eth_subscription',
+        params: {
+          subscription: '0xnewHeads',
+          result: {
+            number: '0x' + fakeBlockNumber.toString(16),
+            hash: fakeBlockHash,
+            parentHash: this.blockchain.getLatestBlock()?.hash || '0x0',
+            timestamp: '0x' + Math.floor(Date.now() / 1000).toString(16),
+            gasLimit: '0x1c9c380',
+            gasUsed: '0x5208',
+            // 🔑 تضمين العنوان المتغير في stateRoot لإشارة للتغيير
+            stateRoot: '0x' + changedAddress.toLowerCase().slice(2).padEnd(64, '0')
+          }
+        }
+      };
+
+      // بث لجميع الاتصالات WebSocket
+      if (this.wss && this.wss.clients) {
+        this.wss.clients.forEach((ws) => {
+          if (ws.readyState === 1) {
+            try {
+              ws.send(JSON.stringify(newHeadsNotification));
+            } catch (e) {}
+          }
+        });
+      }
+
+      // بث للمحافظ المتصلة
+      if (this.connectedWallets) {
+        this.connectedWallets.forEach((walletWs, address) => {
+          if (walletWs.readyState === 1) {
+            try {
+              walletWs.send(JSON.stringify(newHeadsNotification));
+            } catch (e) {}
+          }
+        });
+      }
+    } catch (error) {
+      // Silent error - لا نريد إيقاف العملية
+    }
+  }
+
+  // 🔥 TRUST WALLET FIX: بث newHeads دوري لإبقاء المحافظ محدثة
+  broadcastPeriodicNewHeads() {
+    try {
+      // فقط إذا كان هناك اتصالات نشطة
+      const hasConnections = (this.wss?.clients?.size > 0) || (this.connectedWallets?.size > 0);
+      if (!hasConnections) return;
+
+      const blockNumber = (this.blockchain.chain?.length || 1) + (this.virtualBlockOffset || 0);
+      const blockHash = '0x' + Date.now().toString(16).padStart(64, '0');
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      const newHeadsNotification = {
+        jsonrpc: '2.0',
+        method: 'eth_subscription',
+        params: {
+          subscription: '0x1',
+          result: {
+            number: '0x' + blockNumber.toString(16),
+            hash: blockHash,
+            parentHash: this.blockchain.getLatestBlock()?.hash || '0x0',
+            timestamp: '0x' + timestamp.toString(16),
+            gasLimit: '0x1c9c380',
+            gasUsed: '0x0'
+          }
+        }
+      };
+
+      // بث صامت (بدون log لتجنب spam)
+      if (this.wss?.clients) {
+        this.wss.clients.forEach((ws) => {
+          if (ws.readyState === 1) {
+            try { ws.send(JSON.stringify(newHeadsNotification)); } catch (e) {}
+          }
+        });
+      }
+      if (this.connectedWallets) {
+        this.connectedWallets.forEach((walletWs) => {
+          if (walletWs.readyState === 1) {
+            try { walletWs.send(JSON.stringify(newHeadsNotification)); } catch (e) {}
+          }
+        });
+      }
+    } catch (error) {
+      // Silent error
+    }
+  }
+
+  // ⚡ ETHEREUM-STYLE INSTANT: بث newHeads فوري عند كل معاملة مع إشعارات متعددة
+  broadcastImmediateNewHeads(fromAddress, toAddress, senderBalance, recipientBalance) {
+    try {
+      // ⚡ CRITICAL: زيادة virtualBlockOffset بشكل كبير لإجبار التحديث الفوري
+      this.virtualBlockOffset = (this.virtualBlockOffset || 0) + 1000;
+      
+      const blockNumber = (this.blockchain.chain?.length || 1) + (this.virtualBlockOffset || 0);
+      const blockHash = '0x' + crypto.createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex');
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      // ⚡ ETHEREUM-STYLE: newHeads notification مطابق لـ geth
+      const newHeadsNotification = {
+        jsonrpc: '2.0',
+        method: 'eth_subscription',
+        params: {
+          subscription: '0x1',
+          result: {
+            number: '0x' + blockNumber.toString(16),
+            hash: blockHash,
+            parentHash: this.blockchain.getLatestBlock()?.hash || '0x0',
+            timestamp: '0x' + timestamp.toString(16),
+            gasLimit: '0x1c9c380',
+            gasUsed: '0x5208',
+            miner: '0x0000000000000000000000000000000000000000',
+            difficulty: '0x1',
+            totalDifficulty: '0x1',
+            size: '0x200',
+            logsBloom: '0x' + '0'.repeat(512),
+            transactionsRoot: blockHash,
+            stateRoot: '0x' + crypto.createHash('sha256').update(fromAddress + toAddress + Date.now()).digest('hex'),
+            receiptsRoot: '0x' + 'c'.repeat(64),
+            nonce: '0x0000000000000000',
+            sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+            extraData: '0x',
+            uncles: [],
+            baseFeePerGas: '0x3b9aca00'
+          }
+        }
+      };
+
+      // ⚡ METAMASK-STYLE: إشعار تغير الحسابات
+      const accountsChangedSender = {
+        jsonrpc: '2.0',
+        method: 'metamask_accountsChanged',
+        params: { accounts: [fromAddress] }
+      };
+
+      const accountsChangedRecipient = {
+        jsonrpc: '2.0', 
+        method: 'metamask_accountsChanged',
+        params: { accounts: [toAddress] }
+      };
+
+      // ⚡ TRUST WALLET-STYLE: إشعار تغير الأصول
+      const senderBalanceHex = '0x' + Math.floor((senderBalance || 0) * 1e18).toString(16);
+      const recipientBalanceHex = '0x' + Math.floor((recipientBalance || 0) * 1e18).toString(16);
+
+      const assetsChangedSender = {
+        jsonrpc: '2.0',
+        method: 'wallet_assetsChanged',
+        params: {
+          chainId: '0x5968',
+          address: fromAddress,
+          assets: [{
+            symbol: 'ACCESS',
+            balance: senderBalanceHex,
+            decimals: 18
+          }]
+        }
+      };
+
+      const assetsChangedRecipient = {
+        jsonrpc: '2.0',
+        method: 'wallet_assetsChanged',
+        params: {
+          chainId: '0x5968',
+          address: toAddress,
+          assets: [{
+            symbol: 'ACCESS',
+            balance: recipientBalanceHex,
+            decimals: 18
+          }]
+        }
+      };
+
+      let sentCount = 0;
+
+      // ⚡ إرسال جميع الإشعارات لكل اتصال WebSocket
+      const sendNotifications = (ws) => {
+        if (ws.readyState === 1) {
+          try {
+            // 1. newHeads أولاً - الأهم
+            ws.send(JSON.stringify(newHeadsNotification));
+            // 2. إشعار تغير الحسابات
+            ws.send(JSON.stringify(accountsChangedSender));
+            ws.send(JSON.stringify(accountsChangedRecipient));
+            // 3. إشعار تغير الأصول
+            ws.send(JSON.stringify(assetsChangedSender));
+            ws.send(JSON.stringify(assetsChangedRecipient));
+            sentCount++;
+          } catch (e) {}
+        }
+      };
+
+      // ⚡ بث لجميع اتصالات WebSocket
+      if (this.wss && this.wss.clients) {
+        this.wss.clients.forEach(sendNotifications);
+      }
+
+      // ⚡ بث للمحافظ المتصلة
+      if (this.connectedWallets) {
+        this.connectedWallets.forEach((walletWs) => sendNotifications(walletWs));
+      }
+
+      // ⚡ بث لـ instantSync
+      if (this.instantSync && this.instantSync.walletConnections) {
+        this.instantSync.walletConnections.forEach((connection) => sendNotifications(connection));
+      }
+
+      console.log(`⚡ INSTANT newHeads: block ${blockNumber} → ${sentCount} connections (sender: ${senderBalance?.toFixed(4)} ACCESS, recipient: ${recipientBalance?.toFixed(4)} ACCESS)`);
+
+      // ⚡ إرسال تحديثات الرصيد مباشرة
+      if (fromAddress) this.broadcastInstantBalanceUpdate(fromAddress, senderBalance);
+      if (toAddress) this.broadcastInstantBalanceUpdate(toAddress, recipientBalance);
+
+    } catch (error) {
+      console.error('Error in broadcastImmediateNewHeads:', error);
+    }
   }
 
   // Pure blockchain notification like Ethereum - NO CACHE
@@ -281,18 +567,35 @@ class NetworkNode {
     try {
       const normalizedAddress = address.toLowerCase();
       const balanceHex = '0x' + Math.floor(newBalance * 1e18).toString(16);
+      const blockNumber = '0x' + (this.blockchain.chain?.length || 1).toString(16);
 
-      // 📡 إشعار Trust Wallet فوري
-      const trustWalletNotification = {
+      // 📡 إشعار eth_subscription للرصيد (معيار Ethereum)
+      const balanceSubscriptionNotification = {
         jsonrpc: '2.0',
         method: 'eth_subscription',
         params: {
-          subscription: 'balance_instant',
+          subscription: '0xbalance_' + normalizedAddress.slice(2, 10),
           result: {
             address: normalizedAddress,
             balance: balanceHex,
-            balanceFormatted: newBalance.toFixed(8) + ' ACCESS',
+            blockNumber: blockNumber,
             timestamp: Date.now()
+          }
+        }
+      };
+
+      // 📡 إشعار newHeads مع الرصيد (يجبر المحافظ على إعادة الاستعلام)
+      const newHeadsNotification = {
+        jsonrpc: '2.0',
+        method: 'eth_subscription',
+        params: {
+          subscription: '0xnewHeads',
+          result: {
+            number: blockNumber,
+            hash: '0x' + Date.now().toString(16).padStart(64, '0'),
+            parentHash: this.blockchain.getLatestBlock()?.hash || '0x0',
+            timestamp: '0x' + Math.floor(Date.now() / 1000).toString(16),
+            stateRoot: '0x' + normalizedAddress.slice(2) // إشارة لتغيير الحالة
           }
         }
       };
@@ -304,7 +607,7 @@ class NetworkNode {
         params: [normalizedAddress]
       };
 
-      // 📡 إشعار assetsChanged
+      // 📡 إشعار assetsChanged (Trust Wallet)
       const assetsChangedNotification = {
         jsonrpc: '2.0',
         method: 'wallet_assetsChanged',
@@ -319,22 +622,73 @@ class NetworkNode {
         }
       };
 
-      // إرسال لجميع المحافظ المتصلة
-      if (this.connectedWallets) {
-        this.connectedWallets.forEach((walletWs, walletAddress) => {
-          if (walletWs.readyState === 1 && walletAddress.toLowerCase() === normalizedAddress) {
-            try {
-              walletWs.send(JSON.stringify(trustWalletNotification));
-              walletWs.send(JSON.stringify(accountsChangedNotification));
-              walletWs.send(JSON.stringify(assetsChangedNotification));
-            } catch (error) {
-              console.error(`Error sending instant update to ${address}:`, error);
+      // 🔥 إرسال لجميع الاشتراكات النشطة (balanceChanges)
+      if (this.activeSubscriptions) {
+        this.activeSubscriptions.forEach((subscription, subId) => {
+          if (subscription.type === 'balanceChanges') {
+            // إذا كان الاشتراك لعنوان محدد أو لجميع العناوين
+            if (!subscription.address || subscription.address === normalizedAddress) {
+              try {
+                subscription.callback({
+                  address: normalizedAddress,
+                  balance: balanceHex,
+                  balanceFormatted: newBalance.toFixed(8) + ' ACCESS',
+                  blockNumber: blockNumber,
+                  timestamp: Date.now()
+                });
+              } catch (e) {}
             }
           }
         });
       }
 
-      console.log(`🔔 INSTANT BALANCE UPDATE sent to ${normalizedAddress}: ${newBalance.toFixed(8)} ACCESS`);
+      // 🔥 إرسال لجميع المحافظ المتصلة - بث لجميع الاتصالات لإجبار التحديث
+      if (this.connectedWallets) {
+        this.connectedWallets.forEach((walletWs, walletAddress) => {
+          if (walletWs.readyState === 1) {
+            try {
+              // إرسال جميع الإشعارات بالتتابع السريع
+              walletWs.send(JSON.stringify(balanceSubscriptionNotification));
+              walletWs.send(JSON.stringify(newHeadsNotification));
+              walletWs.send(JSON.stringify(accountsChangedNotification));
+              walletWs.send(JSON.stringify(assetsChangedNotification));
+            } catch (error) {
+              // Silent error
+            }
+          }
+        });
+      }
+
+      // 🔥 إرسال لجميع اتصالات WebSocket (WSS clients)
+      if (this.wss && this.wss.clients) {
+        this.wss.clients.forEach((ws) => {
+          if (ws.readyState === 1) {
+            try {
+              ws.send(JSON.stringify(balanceSubscriptionNotification));
+              ws.send(JSON.stringify(newHeadsNotification));
+            } catch (e) {}
+          }
+        });
+      }
+
+      // 🔥 إرسال لـ instantSync
+      if (this.instantSync && this.instantSync.walletConnections) {
+        this.instantSync.walletConnections.forEach((connection, addr) => {
+          if (connection.readyState === 1) {
+            try {
+              connection.send(JSON.stringify(balanceSubscriptionNotification));
+              connection.send(JSON.stringify(newHeadsNotification));
+              connection.send(JSON.stringify(assetsChangedNotification));
+            } catch (e) {}
+          }
+        });
+      }
+
+      // Log quiet (without spam)
+      if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 2000) {
+        console.log(`🔔 INSTANT BALANCE UPDATE sent to ${normalizedAddress}: ${newBalance.toFixed(8)} ACCESS`);
+        this._lastBalanceLog = Date.now();
+      }
     } catch (error) {
       console.error('Error in broadcastInstantBalanceUpdate:', error);
     }
@@ -853,7 +1207,15 @@ class NetworkNode {
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    // 🔥 TRUST WALLET FIX: منع أي caching نهائياً
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '-1');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // 🔥 ETag متغير لإجبار Trust Wallet على إعادة الطلب
+    res.setHeader('ETag', `"${Date.now()}-${Math.random().toString(36)}"`);
+    res.setHeader('Vary', '*');
+    res.setHeader('Last-Modified', new Date().toUTCString());
     // ✅ TRUST WALLET FIX: Keep connection alive to prevent "socket time expired"
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Keep-Alive', 'timeout=120');
@@ -1186,10 +1548,27 @@ class NetworkNode {
           // توحيد العنوان إلى lowercase
           const normalizedAddress = balanceAddress.toLowerCase();
           
-          // ✅ ETHEREUM-STYLE: Read balance directly from State Trie (blockchain state)
+          // ⚡ INSTANT BALANCE - مثل Ethereum/BSC/Polygon تماماً
+          // القراءة مباشرة من this.blockchain.balances (Map في الذاكرة)
           let finalBalance = 0;
           try {
-            finalBalance = this.blockchain.getBalance(normalizedAddress);
+            // 🔥 PRIORITY 1: قراءة مباشرة من Map الأرصدة في الذاكرة (أسرع طريقة)
+            // هذا هو نفس ما يفعله geth - يقرأ من state trie في الذاكرة
+            const directBalance = this.blockchain.balances?.get(normalizedAddress);
+            if (directBalance !== undefined && directBalance !== null) {
+              finalBalance = directBalance;
+              // تسجيل صامت (كل 5 ثوانٍ فقط لنفس العنوان)
+              const logKey = `balance_${normalizedAddress}`;
+              if (!this._lastBalanceLogTimes) this._lastBalanceLogTimes = {};
+              if (!this._lastBalanceLogTimes[logKey] || Date.now() - this._lastBalanceLogTimes[logKey] > 5000) {
+                console.log(`⚡ DIRECT BALANCE: ${normalizedAddress.slice(0, 10)}... = ${finalBalance.toFixed(8)} ACCESS`);
+                this._lastBalanceLogTimes[logKey] = Date.now();
+              }
+            } else {
+              // 🔥 PRIORITY 2: fallback لـ getBalance() إذا لم يكن في الـ Map مباشرة
+              finalBalance = this.blockchain.getBalance(normalizedAddress);
+            }
+            
             // ✅ التأكد من أن القيمة رقمية وليست NaN
             if (isNaN(finalBalance) || finalBalance === null || finalBalance === undefined) {
               finalBalance = 0;
@@ -1200,7 +1579,8 @@ class NetworkNode {
           }
           
           // ✅ CRITICAL: التأكد من عدم إرجاع قيم سالبة أو غير صحيحة
-          const balanceInWei = Math.floor(Math.max(0, finalBalance) * 1e18);
+          finalBalance = Math.max(0, finalBalance);
+          const balanceInWei = Math.floor(finalBalance * 1e18);
           
           // ✅ التحقق من صحة القيمة النهائية
           if (balanceInWei < 0 || isNaN(balanceInWei) || !isFinite(balanceInWei)) {
@@ -1209,8 +1589,6 @@ class NetworkNode {
           } else {
             result = '0x' + balanceInWei.toString(16);
           }
-          
-          console.log(`💰 eth_getBalance: ${normalizedAddress} = ${finalBalance.toFixed(8)} ACCESS (${result})`);
           break;
 
         case 'eth_sendTransaction':
@@ -1323,15 +1701,14 @@ class NetworkNode {
               throw new Error(`Transaction rejected: ${parseError.message}`);
             }
 
-            // 🚀 BALANCE CHECK FIRST - no premature deduction
-            console.log(`🔍 TRUST WALLET: Checking balance before any deduction`);
-            // Don't deduct balance until we verify it's sufficient
-
             // ✅ CONTRACT DEPLOYMENT: Allow empty 'to' for contract deployment
             if (!txData || !txData.from) {
               console.error('❌ Transaction parsing failed - rejecting transaction');
               throw new Error('Transaction rejected: Unable to parse sender address');
             }
+            
+            // ⚡ علامة لمنع الخصم المزدوج - الأرصدة ستُحدث في addTransaction فقط
+            txData.balanceAlreadyProcessed = false;
             
             // For regular transactions, 'to' is required, but for contract deployment it's empty
             if (!txData.isContractDeployment && !txData.to) {
@@ -1561,6 +1938,47 @@ class NetworkNode {
             console.log(`✅ TRANSACTION COMPLETED SUCCESSFULLY: ${txHash}`);
             console.log(`📊 FINAL BALANCES: Sender: ${finalSenderBalance.toFixed(8)} ACCESS, Recipient: ${finalRecipientBalance.toFixed(8)} ACCESS`);
 
+            // 🔥 METAMASK-STYLE: تسجيل المعاملة في confirmedTransactionTracker
+            // هذا يحاكي سلوك TransactionController:transactionConfirmed في MetaMask
+            if (this.confirmedTransactionTracker) {
+              this.confirmedTransactionTracker.set(txHash, {
+                from: txData.from.toLowerCase(),
+                to: txData.to.toLowerCase(),
+                timestamp: Date.now(),
+                senderBalance: finalSenderBalance,
+                recipientBalance: finalRecipientBalance
+              });
+            }
+            
+            // 🔥 METAMASK-STYLE: تسجيل الأرصدة المؤكدة للوصول الفوري
+            // هذا يحاكي سلوك refreshAddresses() في AccountTrackerController
+            if (this.recentlyConfirmedAddresses) {
+              this.recentlyConfirmedAddresses.set(txData.from.toLowerCase(), {
+                balance: finalSenderBalance,
+                timestamp: Date.now()
+              });
+              this.recentlyConfirmedAddresses.set(txData.to.toLowerCase(), {
+                balance: finalRecipientBalance,
+                timestamp: Date.now()
+              });
+              console.log(`⚡ METAMASK-STYLE: Cached confirmed balances for instant eth_getBalance response`);
+            }
+
+            // 🔥 CRITICAL: تحديث lastBalanceChange لتفعيل التحديث التلقائي
+            this.lastBalanceChange = Date.now();
+
+            // ⚡ ETHEREUM-STYLE INSTANT SYNC: زيادة كبيرة جداً لإجبار المحافظ على تحديث فوري
+            if (!this.virtualBlockOffset) this.virtualBlockOffset = 0;
+            this.virtualBlockOffset += 500; // زيادة ضخمة جداً لضمان التحديث الفوري (5x أكثر من السابق)
+            this.lastBalanceChange = Date.now(); // تحديث timestamp
+            // إضافة العناوين للقائمة المعلقة
+            this.pendingBalanceAddresses.add(txData.from.toLowerCase());
+            this.pendingBalanceAddresses.add(txData.to.toLowerCase());
+            console.log(`⚡ INSTANT: Virtual block jumped +500 to: ${this.virtualBlockOffset} (addresses marked for sync)`);
+
+            // 🔥 بث newHeads فوري لجميع الاتصالات
+            this.broadcastImmediateNewHeads(txData.from, txData.to, finalSenderBalance, finalRecipientBalance);
+
             // 🚀 Trust Wallet Synchronization Fix - حل مشكلة عدم التزامن
             setTimeout(async () => {
               try {
@@ -1669,7 +2087,35 @@ class NetworkNode {
           break;
 
         case 'eth_blockNumber':
-          result = '0x' + (this.blockchain.chain.length - 1).toString(16);
+          // ⚡ METAMASK-STYLE: block number يتغير بشكل عدواني جداً لإجبار المحافظ على eth_getBalance جديد
+          // من بحث MetaMask Core: AccountTrackerController يستخدم 10 ثوانٍ polling interval
+          // لكن عند transactionConfirmed يستدعي refreshAddresses() فوراً
+          // الحل: نجعل block number يتغير بشكل مختلف في كل طلب
+          
+          const realBlockNumber = this.blockchain.chain.length - 1;
+          const virtualOffset = this.virtualBlockOffset || 0;
+          
+          // ⚡ UNIQUE BLOCK: رقم فريد لكل طلب (تغيير كل 5ms)
+          const uniqueTimestamp = Math.floor(Date.now() / 5);
+          
+          // ⚡ RANDOM COMPONENT: إضافة عشوائية لضمان التغيير المستمر
+          const randomOffset = Math.floor(Math.random() * 100);
+          
+          // ⚡ PENDING BOOST: زيادة كبيرة عند وجود عناوين معلقة
+          const pendingBoost = (this.pendingBalanceAddresses?.size || 0) * 500;
+          
+          // ⚡ CONFIRMATION BOOST: زيادة إضافية عند وجود معاملات مؤكدة حديثاً
+          const confirmationBoost = (this.confirmedTransactionTracker?.size || 0) * 200;
+          
+          // حساب رقم البلوك النهائي
+          const calculatedBlock = realBlockNumber + virtualOffset + (uniqueTimestamp % 100000) + randomOffset + pendingBoost + confirmationBoost;
+          result = '0x' + calculatedBlock.toString(16);
+          
+          // تسجيل صامت (كل 10 ثوانٍ فقط)
+          if (!this._lastBlockNumberLog || Date.now() - this._lastBlockNumberLog > 10000) {
+            console.log(`📦 eth_blockNumber: ${calculatedBlock} (real: ${realBlockNumber}, virtual: ${virtualOffset}, pending: ${this.pendingBalanceAddresses?.size || 0})`);
+            this._lastBlockNumberLog = Date.now();
+          }
           break;
 
         case 'net_version':
@@ -2114,6 +2560,32 @@ class NetworkNode {
           result.forEach(wallet => {
             console.log(`   - ${wallet.address}: ${wallet.balance} ACCESS`);
           });
+          break;
+
+        case 'access_resetReservations':
+          // 🔄 إعادة تعيين جميع الحجوزات (لحل مشكلة INSUFFICIENT BALANCE)
+          if (this.blockchain.resetAllReservations) {
+            this.blockchain.resetAllReservations();
+          }
+          result = {
+            success: true,
+            message: 'All reservations have been reset',
+            timestamp: Date.now()
+          };
+          console.log('🔄 Reset all reservations via RPC');
+          break;
+
+        case 'access_getReservationStatus':
+          // عرض حالة الحجوزات الحالية
+          const reservedBalances = {};
+          this.blockchain.reservedBalances.forEach((amount, address) => {
+            reservedBalances[address] = amount.toFixed(8);
+          });
+          result = {
+            reservedBalances: reservedBalances,
+            pendingReservationsCount: this.blockchain.pendingReservations.size,
+            reservationTimeout: this.blockchain.reservationTimeout
+          };
           break;
 
         case 'access_debugWalletInfo':
@@ -2710,6 +3182,19 @@ class NetworkNode {
               console.log(`📡 New subscription for pending operations: ${subscriptionId}`);
               break;
 
+            case 'balanceChanges':
+              // 🔥 ETHEREUM-STYLE: اشتراك في تغييرات الرصيد (مخصص لـ Trust Wallet)
+              const watchAddress = params[1]?.address?.toLowerCase();
+              this.activeSubscriptions.set(subscriptionId, {
+                type: 'balanceChanges',
+                address: watchAddress,
+                callback: (balanceData) => {
+                  this.broadcastSubscriptionResult(subscriptionId, balanceData);
+                }
+              });
+              console.log(`📡 New subscription for balance changes: ${subscriptionId} (${watchAddress || 'all'})`);
+              break;
+
             case 'syncing':
               // حالة المزامنة
               this.activeSubscriptions.set(subscriptionId, {
@@ -2966,6 +3451,26 @@ class NetworkNode {
       // ⚠️ CRITICAL: addTransaction يستدعي processTransactionImmediately داخلياً
       // والذي يقوم بتحديث الأرصدة - لذلك لا نحتاج لاستدعاء processTransactionBalances!
       const txHash = await this.blockchain.addTransaction(transaction);
+
+      // ⚡ INSTANT BALANCE BROADCAST - بث الرصيد الجديد فوراً للمحافظ
+      try {
+        const senderNewBalance = this.blockchain.getBalance(txData.from);
+        const receiverNewBalance = txData.to ? this.blockchain.getBalance(txData.to) : 0;
+        
+        // بث للمرسل
+        this.broadcastInstantBalanceUpdate(txData.from, senderNewBalance);
+        this.broadcastNewHeadsForBalanceUpdate(txData.from);
+        
+        // بث للمستقبل
+        if (txData.to) {
+          this.broadcastInstantBalanceUpdate(txData.to, receiverNewBalance);
+          this.broadcastNewHeadsForBalanceUpdate(txData.to);
+        }
+        
+        console.log(`⚡ INSTANT BROADCAST: Sender ${senderNewBalance.toFixed(4)} ACCESS, Receiver ${receiverNewBalance.toFixed(4)} ACCESS`);
+      } catch (broadcastError) {
+        console.warn('⚠️ Instant broadcast warning:', broadcastError.message);
+      }
 
       // ❌ REMOVED: processTransactionBalances - كان يسبب إضافة الرصيد مرتين!
       // await this.processTransactionBalances(transaction);
@@ -4065,7 +4570,7 @@ class NetworkNode {
       this.connectedWallets.forEach((walletWs, address) => {
         if (walletWs.readyState === 1) {
           try {
-            ws.send(JSON.stringify(subscriptionMessage));
+            walletWs.send(JSON.stringify(subscriptionMessage));
           } catch (error) {
             console.error(`Error sending subscription to ${address}:`, error);
           }
@@ -4193,7 +4698,7 @@ class NetworkNode {
 
   async getBlockByNumber(blockNumber) {
     let index;
-    if (blockNumber === 'latest') {
+    if (blockNumber === 'latest' || blockNumber === 'pending') {
       index = this.blockchain.chain.length - 1;
     } else {
       index = parseInt(blockNumber, 16);
@@ -4201,7 +4706,6 @@ class NetworkNode {
 
     // 🔧 FIX: تأكد من وجود الـ blockchain chain
     if (!this.blockchain.chain || this.blockchain.chain.length === 0) {
-      console.warn('⚠️ Blockchain is empty - returning genesis block placeholder');
       return {
         number: '0x0',
         hash: '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -4219,19 +4723,15 @@ class NetworkNode {
 
     const block = this.blockchain.getBlockByIndex(index);
     
-    // 🔧 FIX: إذا لم يوجد block، إرجاع object متوافق مع Ethereum بدلاً من null
     if (!block) {
-      console.warn(`⚠️ Block ${blockNumber} not found - returning null as per Ethereum standard`);
       return null;
     }
 
-    // حساب إجمالي صعوبة الكتل السابقة
     let totalDifficulty = 0;
     for (let i = 0; i <= index; i++) {
-      totalDifficulty += this.blockchain.difficulty; // افتراض أن الصعوبة ثابتة
+      totalDifficulty += this.blockchain.difficulty;
     }
 
-    // ✅ التأكد من أن transactions دائماً array وليس undefined
     const transactions = Array.isArray(block.transactions) 
       ? block.transactions.map(tx => tx.txId || tx.hash) 
       : [];
@@ -4244,7 +4744,6 @@ class NetworkNode {
       transactions: transactions,
       difficulty: '0x' + this.blockchain.difficulty.toString(16),
       totalDifficulty: '0x' + totalDifficulty.toString(16),
-      // إضافة حقول إضافية لتوافق أفضل مع Trust Wallet
       nonce: block.nonce ? '0x' + block.nonce.toString(16) : '0x0',
       miner: '0x0000000000000000000000000000000000000000',
       gasLimit: '0x1c9c380',

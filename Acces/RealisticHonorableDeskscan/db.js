@@ -888,6 +888,26 @@ async function initializeDatabase() {
       )
     `);
 
+    // Add re-engagement notification columns to users table
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'last_login'
+        ) THEN
+          ALTER TABLE users ADD COLUMN last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'last_reengagement_notification'
+        ) THEN
+          ALTER TABLE users ADD COLUMN last_reengagement_notification TIMESTAMP NULL;
+        END IF;
+      END $$;
+    `);
+
     console.log('PostgreSQL database initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);

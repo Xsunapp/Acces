@@ -1101,7 +1101,7 @@ body.arabic .mobile-nav-item span {
   vertical-align: middle;
   opacity: 1 !important;
   background-color: transparent;
-  content: url("image__2_-removebg-preview.png");
+  content: url("accessoire-app.png");
 }
 
 .referral-icon {
@@ -1512,7 +1512,7 @@ object-fit: contain;
   -webkit-filter: none !important;
   opacity: 1 !important;
   background-color: transparent;
-  content: url("image__2_-removebg-preview.png");
+  content: url("accessoire-app.png");
 }
 
 
@@ -1844,7 +1844,7 @@ object-fit: contain;
   -webkit-filter: none !important;
   opacity: 1 !important;
   background-color: transparent;
-  content: url("image__2_-removebg-preview.png");
+  content: url("accessoire-app.png");
 }
 
 /* زيادة حجم اللوغو خصيصاً في صفحة السحب */
