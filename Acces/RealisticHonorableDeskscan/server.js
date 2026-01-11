@@ -496,19 +496,17 @@ async function sendWebPushNotificationToRecipient(transactionData) {
       return;
     }
 
-    // Prepare notification payload
+    // Prepare notification payload - FLAT structure for Service Worker
     const payload = JSON.stringify({
+      type: 'transaction_received',
       title: 'Received ACCESS',
       body: `From: ${fromShort}\nAmount: ${amount} ACCESS`,
       tag: `access-tx-${transactionData.hash || Date.now()}`,
-      data: {
-        type: 'transaction_received',
-        hash: transactionData.hash,
-        amount: amount,
-        from: fromAddress,
-        to: recipientWallet,
-        timestamp: Date.now()
-      }
+      hash: transactionData.hash,
+      amount: amount,
+      from: fromAddress,
+      to: recipientWallet,
+      timestamp: Date.now()
     });
 
     // Send to all subscriptions
