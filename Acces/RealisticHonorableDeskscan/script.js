@@ -10392,8 +10392,32 @@ if (totalCost > (currentBalance + precision)) {
       // Hide empty state
       if (emptyTransactions) emptyTransactions.style.display = 'none';
 
-      // Add transactions to the list
-      transactions.slice(0, ).forEach(tx => {
+      // Store all transactions globally for pagination
+      window.allUserTransactions = transactions;
+      window.displayedTxCount = Math.min(25, transactions.length);
+
+      // Display first 25 transactions
+      renderTransactions(transactions.slice(0, 25), transactionList);
+      
+      // Add pagination buttons if needed
+      updatePaginationButtons(transactionList);
+
+      // Update stats
+      const totalBlocksElement = document.getElementById('total-blocks');
+      const totalTransactionsElement = document.getElementById('total-transactions');
+      if (totalBlocksElement) totalBlocksElement.textContent = Math.floor(transactions.length / 10) + 1;
+      if (totalTransactionsElement) totalTransactionsElement.textContent = transactions.length;
+
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+      transactionList.innerHTML = '<div class="error-message">Failed to load transactions</div>';
+      if (emptyTransactions) emptyTransactions.style.display = 'flex';
+    }
+  }
+
+  // Render transactions to the list
+  function renderTransactions(txList, container) {
+    txList.forEach(tx => {
         const item = document.createElement('div');
         item.className = 'transaction-item';
 
@@ -10457,68 +10481,464 @@ if (totalCost > (currentBalance + precision)) {
         if (tx.hash) item.setAttribute('data-tx-hash', tx.hash);
         item.style.cursor = 'pointer';
         item.onclick = function() { navigateToTransactionDetails(this); };
-        transactionList.appendChild(item);
+        container.appendChild(item);
       });
-
-      // Update stats
-      const totalBlocksElement = document.getElementById('total-blocks');
-      const totalTransactionsElement = document.getElementById('total-transactions');
-
-      // Use totalCount from API if available, otherwise use transactions length
-      const totalTxCount = data.totalCount || transactions.length;
-      if (totalBlocksElement) totalBlocksElement.textContent = Math.floor(totalTxCount / 10) + 1;
-      if (totalTransactionsElement) totalTransactionsElement.textContent = totalTxCount;
-
-    } catch (error) {
-      console.error("Failed to fetch transactions:", error);
-      transactionList.innerHTML = '<div class="error-message">Failed to fetch transactions: ' + error.message + '</div>';
-      if (emptyTransactions) emptyTransactions.style.display = 'flex';
-
-      // Try to recover by showing any local transactions we might have
-      setTimeout(() => {
-        if (currentUser.wallet && currentUser.wallet.transactions && currentUser.wallet.transactions.length > 0) {
-          console.log("Showing local transactions as recovery after API failure");
-          transactionList.innerHTML = '';
-
-          currentUser.wallet.transactions.slice(0, 10).forEach(tx => {
-            // Create transaction UI elements (similar to code above)
-            const item = document.createElement('div');
-            item.className = 'transaction-item recovery-item';
-
-            const userAddress = currentUser.wallet?.publicAddress || '';
-            const isOutgoing = tx.from === userAddress || tx.sender_address === userAddress;
-            const iconClass = isOutgoing ? 'arrow-up' : 'arrow-down';
-            const iconColor = isOutgoing ? '#f44336' : '#4CAF50';
-
-            item.innerHTML = `
-              <div class="transaction-icon">
-                <i class="fas fa-${iconClass}" style="color: ${iconColor}"></i>
-              </div>
-              <div class="transaction-details">
-                <div class="transaction-addresses">
-                  <div class="transaction-from">From: ${abbreviateAddress(tx.from || tx.sender_address || 'Unknown')}</div>
-                  <div class="transaction-to">To: ${abbreviateAddress(tx.to || tx.recipient_address || 'Unknown')}</div>
-                </div>
-                <div class="transaction-meta">
-                  <div class="transaction-amount ${isOutgoing ? 'outgoing' : 'incoming'}">
-                    ${isOutgoing ? '-' : '+'} ${parseFloat(tx.amount).toLocaleString()} Accessoire
-                  </div>
-                  <div class="transaction-date">${new Date(parseInt(tx.timestamp)).toLocaleString()}</div>
-                </div>
-              </div>
-            `;
-
-            if (tx.hash) item.setAttribute('data-tx-hash', tx.hash);
-            item.style.cursor = 'pointer';
-            item.onclick = function() { navigateToTransactionDetails(this); };
-            transactionList.appendChild(item);
-          });
-
-          if (emptyTransactions) emptyTransactions.style.display = 'none';
-        }
-      }, 1000);
-    }
   }
+
+  // Update pagination buttons
+  function updatePaginationButtons(container) {
+    // Remove existing pagination
+    const existingPagination = document.getElementById('txPaginationBtns');
+    if (existingPagination) existingPagination.remove();
+
+    const total = window.allUserTransactions ? window.allUserTransactions.length : 0;
+    const displayed = window.displayedTxCount || 0;
+
+    if (total <= 25) return; // No pagination needed
+
+    const paginationDiv = document.createElement('div');
+    paginationDiv.id = 'txPaginationBtns';
+    paginationDiv.style.cssText = 'display: flex; justify-content: center; gap: 10px; padding: 15px; flex-wrap: wrap;';
+
+    let buttonsHtml = '';
+
+    // Get translated button texts
+    const showLessText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Show Less') : 'Show Less';
+    const showMoreText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Show More') : 'Show More';
+    const resetText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Reset') : 'Reset';
+
+    // Show Less button (only if more than 25 displayed)
+    if (displayed > 25) {
+      buttonsHtml += `
+        <button onclick="showLessTransactions()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+          <i class="fas fa-chevron-up"></i> ${showLessText}
+        </button>
+      `;
+    }
+
+    // Show More button (only if there are more to show)
+    if (displayed < total) {
+      buttonsHtml += `
+        <button onclick="showMoreTransactions()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+          <i class="fas fa-chevron-down"></i> ${showMoreText} (${displayed}/${total})
+        </button>
+      `;
+    }
+
+    // Reset button (only if not at initial state)
+    if (displayed > 25) {
+      buttonsHtml += `
+        <button onclick="resetTransactions()" style="padding: 10px 20px; background: #374151; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+          <i class="fas fa-undo"></i> ${resetText}
+        </button>
+      `;
+    }
+
+    paginationDiv.innerHTML = buttonsHtml;
+    container.appendChild(paginationDiv);
+  }
+
+  // Show more transactions
+  window.showMoreTransactions = function() {
+    const container = document.getElementById('transaction-list');
+    const total = window.allUserTransactions.length;
+    const currentCount = window.displayedTxCount;
+    const newCount = Math.min(currentCount + 25, total);
+
+    // Get next batch
+    const nextBatch = window.allUserTransactions.slice(currentCount, newCount);
+    
+    // Remove pagination buttons before adding new items
+    const pagination = document.getElementById('txPaginationBtns');
+    if (pagination) pagination.remove();
+
+    // Add new transactions
+    renderTransactions(nextBatch, container);
+    
+    window.displayedTxCount = newCount;
+    updatePaginationButtons(container);
+  };
+
+  // Show less transactions
+  window.showLessTransactions = function() {
+    const container = document.getElementById('transaction-list');
+    const currentCount = window.displayedTxCount;
+    const newCount = Math.max(currentCount - 25, 25);
+
+    // Clear and re-render
+    container.innerHTML = '';
+    renderTransactions(window.allUserTransactions.slice(0, newCount), container);
+    
+    window.displayedTxCount = newCount;
+    updatePaginationButtons(container);
+  };
+
+  // Reset to first 25
+  window.resetTransactions = function() {
+    const container = document.getElementById('transaction-list');
+    container.innerHTML = '';
+    // Reset filter and search
+    window.currentTxFilter = 'all';
+    window.currentTxSearch = '';
+    const searchInput = document.getElementById('txSearchInput');
+    if (searchInput) searchInput.value = '';
+    const filterLabel = document.getElementById('txFilterLabel');
+    if (filterLabel) filterLabel.textContent = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('All') : 'All';
+    
+    renderTransactions(window.allUserTransactions.slice(0, 25), container);
+    window.displayedTxCount = Math.min(25, window.allUserTransactions.length);
+    updatePaginationButtons(container);
+  };
+
+  // Transaction filter state
+  window.currentTxFilter = 'all';
+  window.currentTxSearch = '';
+  window.filteredTransactions = [];
+
+  // Toggle filter menu - positions it near the clicked button
+  window.toggleTxFilterMenu = function(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('txFilterMenu');
+    if (!menu) return;
+    
+    // If menu is open, close it
+    if (menu.style.display === 'block') {
+      menu.style.display = 'none';
+      return;
+    }
+    
+    const btn = event ? event.currentTarget : (document.getElementById('txFilterBtn') || document.getElementById('txFilterBtnMobile'));
+    if (!btn) return;
+    
+    const rect = btn.getBoundingClientRect();
+    const menuHeight = 350;
+    const menuWidth = 170;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    // Reset positions
+    menu.style.top = 'auto';
+    menu.style.bottom = 'auto';
+    menu.style.left = 'auto';
+    menu.style.right = 'auto';
+    
+    // Check if menu will be cut off (not enough space above OR below)
+    if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+      // Open to the LEFT of button, vertically centered on screen
+      menu.style.right = (window.innerWidth - rect.left + 8) + 'px';
+      menu.style.top = Math.max(10, (window.innerHeight - menuHeight) / 2) + 'px';
+    } else if (spaceBelow < menuHeight) {
+      // Not enough space below - open ABOVE
+      menu.style.right = (window.innerWidth - rect.right) + 'px';
+      menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    } else {
+      // Normal - open below
+      menu.style.right = (window.innerWidth - rect.right) + 'px';
+      menu.style.top = (rect.bottom + 4) + 'px';
+    }
+    
+    menu.style.display = 'block';
+  };
+
+  // Close filter menu when clicking outside
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('txFilterMenu');
+    const btn = document.getElementById('txFilterBtn');
+    const btnMobile = document.getElementById('txFilterBtnMobile');
+    
+    if (menu && menu.style.display === 'block') {
+      const clickedBtn = (btn && btn.contains(e.target)) || (btnMobile && btnMobile.contains(e.target));
+      if (!clickedBtn && !menu.contains(e.target)) {
+        menu.style.display = 'none';
+      }
+    }
+  });
+
+  // Close filter menu when scrolling
+  window.addEventListener('scroll', function() {
+    const menu = document.getElementById('txFilterMenu');
+    if (menu && menu.style.display === 'block') {
+      menu.style.display = 'none';
+    }
+  }, true);
+
+  // Apply transaction filter
+  window.applyTxFilter = function(filter) {
+    window.currentTxFilter = filter;
+    const menu = document.getElementById('txFilterMenu');
+    if (menu) menu.style.display = 'none';
+
+    // Highlight active filter option (including showAll)
+    document.querySelectorAll('.tx-filter-option').forEach(opt => {
+      if (opt.getAttribute('data-filter') === filter) {
+        opt.style.background = 'var(--primary-light, #ede9fe)';
+        opt.style.color = '#7c3aed';
+      } else {
+        opt.style.background = 'transparent';
+        opt.style.color = 'var(--text-primary, inherit)';
+      }
+    });
+
+    // Handle "Show All Transactions" - expand all at once
+    if (filter === 'showAll') {
+      // Update labels for showAll too
+      const filterLabel = document.getElementById('txFilterLabel');
+      const filterLabelMobile = document.getElementById('txFilterLabelMobile');
+      const labelText = 'Show All Transactions';
+      const translatedText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate(labelText) : labelText;
+      if (filterLabel) filterLabel.textContent = translatedText;
+      if (filterLabelMobile) filterLabelMobile.textContent = translatedText;
+      
+      window.showAllTransactionsAtOnce();
+      return;
+    }
+
+    // Update filter labels (both desktop and mobile)
+    const filterLabel = document.getElementById('txFilterLabel');
+    const filterLabelMobile = document.getElementById('txFilterLabelMobile');
+    const filterLabels = {
+      'all': 'All',
+      'showAll': 'Show All Transactions',
+      'newest': 'Newest',
+      'oldest': 'Oldest',
+      'highest': 'Highest Amount',
+      'lowest': 'Lowest Amount',
+      'sent': 'Sent',
+      'received': 'Received'
+    };
+    const labelText = filterLabels[filter] || 'All';
+    const translatedText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate(labelText) : labelText;
+    
+    if (filterLabel) filterLabel.textContent = translatedText;
+    if (filterLabelMobile) filterLabelMobile.textContent = translatedText;
+
+    console.log('Calling applyTransactionFilters from filter selection');
+    window.applyTransactionFilters();
+  };
+
+  // Show all transactions at once (no pagination)
+  window.showAllTransactionsAtOnce = function() {
+    const container = document.getElementById('transaction-list');
+    if (!container) {
+      console.log('Transaction list container not found');
+      return;
+    }
+    
+    const transactions = window.allUserTransactions || [];
+    if (transactions.length === 0) {
+      console.log('No transactions to show');
+      return;
+    }
+    
+    console.log('Showing all', transactions.length, 'transactions at once');
+    
+    // Clear existing
+    container.innerHTML = '';
+    
+    // Remove any existing pagination buttons
+    const existingPagination = document.getElementById('txPaginationBtns');
+    if (existingPagination) existingPagination.remove();
+    
+    // Use renderTransactions to show ALL transactions
+    renderTransactions(transactions, container);
+    
+    // Update displayed count to total
+    window.displayedTxCount = transactions.length;
+    window.filteredTransactions = transactions;
+    
+    // Show Reset button using the same method as other filters
+    const resetText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Reset') : 'Reset';
+    const paginationDiv = document.createElement('div');
+    paginationDiv.id = 'txPaginationBtns';
+    paginationDiv.style.cssText = 'display: flex; justify-content: center; gap: 10px; padding: 15px; flex-wrap: wrap;';
+    paginationDiv.innerHTML = `<button onclick="resetTransactions()" style="padding: 10px 20px; background: #374151; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;"><i class="fas fa-undo"></i> ${resetText}</button>`;
+    container.appendChild(paginationDiv);
+    
+    // Update labels
+    const filterLabel = document.getElementById('txFilterLabel');
+    const filterLabelMobile = document.getElementById('txFilterLabelMobile');
+    const labelText = 'Show All Transactions';
+    const translatedText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate(labelText) : labelText;
+    if (filterLabel) filterLabel.textContent = translatedText;
+    if (filterLabelMobile) filterLabelMobile.textContent = translatedText;
+  };
+
+  // Search transactions by address or hash
+  window.filterTransactionsBySearch = function(searchText) {
+    console.log('Search input:', searchText);
+    window.currentTxSearch = searchText.toLowerCase().trim();
+    console.log('Calling applyTransactionFilters from search');
+    window.applyTransactionFilters();
+  };
+
+  // Apply all filters (search + filter type)
+  window.applyTransactionFilters = function() {
+    if (!window.allUserTransactions || window.allUserTransactions.length === 0) {
+      console.log('No transactions to filter');
+      return;
+    }
+
+    console.log('Applying filters:', window.currentTxFilter, 'Search:', window.currentTxSearch);
+    console.log('Total transactions available:', window.allUserTransactions.length);
+
+    let filtered = [...window.allUserTransactions];
+    
+    // Get user wallet address - check both local and window scope
+    const user = currentUser || window.currentUser;
+    const userWallet = user && user.wallet ? (user.wallet.address || user.wallet.publicAddress || '').toLowerCase() : '';
+    console.log('User wallet for filtering:', userWallet);
+
+    // Apply search filter
+    if (window.currentTxSearch && window.currentTxSearch.length > 0) {
+      console.log('Searching for:', window.currentTxSearch);
+      filtered = filtered.filter(tx => {
+        const from = (tx.from_address || tx.fromAddress || '').toLowerCase();
+        const to = (tx.to_address || tx.toAddress || '').toLowerCase();
+        const hash = (tx.hash || tx.transaction_hash || tx.txHash || '').toLowerCase();
+        const matches = from.includes(window.currentTxSearch) || 
+               to.includes(window.currentTxSearch) || 
+               hash.includes(window.currentTxSearch);
+        return matches;
+      });
+      console.log('After search filter:', filtered.length, 'transactions');
+    }
+
+    // Apply type filter
+    console.log('Applying filter type:', window.currentTxFilter);
+    switch (window.currentTxFilter) {
+      case 'newest':
+        filtered.sort((a, b) => {
+          const dateA = new Date(a.created_at || a.timestamp || a.date || 0);
+          const dateB = new Date(b.created_at || b.timestamp || b.date || 0);
+          return dateB - dateA;
+        });
+        console.log('Sorted by newest');
+        break;
+      case 'oldest':
+        filtered.sort((a, b) => {
+          const dateA = new Date(a.created_at || a.timestamp || a.date || 0);
+          const dateB = new Date(b.created_at || b.timestamp || b.date || 0);
+          return dateA - dateB;
+        });
+        console.log('Sorted by oldest');
+        break;
+      case 'highest':
+        filtered.sort((a, b) => parseFloat(b.amount || b.value || 0) - parseFloat(a.amount || a.value || 0));
+        console.log('Sorted by highest amount');
+        break;
+      case 'lowest':
+        filtered.sort((a, b) => parseFloat(a.amount || a.value || 0) - parseFloat(b.amount || b.value || 0));
+        console.log('Sorted by lowest amount');
+        break;
+      case 'sent':
+        if (userWallet) {
+          filtered = filtered.filter(tx => {
+            const from = (tx.from_address || tx.fromAddress || '').toLowerCase();
+            return from === userWallet;
+          });
+          console.log('Filtered sent transactions:', filtered.length);
+        }
+        break;
+      case 'received':
+        if (userWallet) {
+          filtered = filtered.filter(tx => {
+            const to = (tx.to_address || tx.toAddress || '').toLowerCase();
+            return to === userWallet;
+          });
+          console.log('Filtered received transactions:', filtered.length);
+        }
+        break;
+      default: // 'all'
+        console.log('Showing all transactions');
+        break;
+    }
+
+    window.filteredTransactions = filtered;
+    window.displayedTxCount = Math.min(25, filtered.length);
+    console.log('Final filtered count:', filtered.length, 'Displaying:', window.displayedTxCount);
+
+    const container = document.getElementById('transaction-list');
+    if (container) {
+      container.innerHTML = '';
+      if (filtered.length === 0) {
+        const noResults = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('No transactions found') : 'No transactions found';
+        container.innerHTML = `<div class="empty-transactions" style="text-align: center; padding: 30px; color: var(--text-secondary, #6b7280);"><i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px;"></i><p>${noResults}</p></div>`;
+      } else {
+        renderTransactions(filtered.slice(0, window.displayedTxCount), container);
+        updatePaginationButtonsFiltered(container, filtered);
+      }
+    }
+    console.log('Filter applied successfully!');
+  };
+
+  // Update pagination for filtered results
+  function updatePaginationButtonsFiltered(container, filteredList) {
+    const existingPagination = document.getElementById('txPaginationBtns');
+    if (existingPagination) existingPagination.remove();
+
+    const total = filteredList.length;
+    const displayed = window.displayedTxCount || 0;
+
+    if (total <= 25 && displayed <= 25) return;
+
+    const paginationDiv = document.createElement('div');
+    paginationDiv.id = 'txPaginationBtns';
+    paginationDiv.style.cssText = 'display: flex; justify-content: center; gap: 10px; padding: 15px; flex-wrap: wrap;';
+
+    const showLessText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Show Less') : 'Show Less';
+    const showMoreText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Show More') : 'Show More';
+    const resetText = (typeof translator !== 'undefined' && translator.translate) ? translator.translate('Reset') : 'Reset';
+
+    let buttonsHtml = '';
+
+    if (displayed > 25) {
+      buttonsHtml += `<button onclick="showLessFiltered()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;"><i class="fas fa-chevron-up"></i> ${showLessText}</button>`;
+    }
+
+    if (displayed < total) {
+      buttonsHtml += `<button onclick="showMoreFiltered()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;"><i class="fas fa-chevron-down"></i> ${showMoreText} (${displayed}/${total})</button>`;
+    }
+
+    if (displayed > 25 || window.currentTxFilter !== 'all' || window.currentTxSearch) {
+      buttonsHtml += `<button onclick="resetTransactions()" style="padding: 10px 20px; background: #374151; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;"><i class="fas fa-undo"></i> ${resetText}</button>`;
+    }
+
+    paginationDiv.innerHTML = buttonsHtml;
+    container.appendChild(paginationDiv);
+  }
+
+  // Show more filtered transactions
+  window.showMoreFiltered = function() {
+    const filtered = window.filteredTransactions || window.allUserTransactions;
+    const currentCount = window.displayedTxCount;
+    const newCount = Math.min(currentCount + 25, filtered.length);
+
+    const container = document.getElementById('transaction-list');
+    const pagination = document.getElementById('txPaginationBtns');
+    if (pagination) pagination.remove();
+
+    const nextBatch = filtered.slice(currentCount, newCount);
+    nextBatch.forEach(tx => {
+      const txElement = createTransactionElement(tx);
+      container.appendChild(txElement);
+    });
+
+    window.displayedTxCount = newCount;
+    updatePaginationButtonsFiltered(container, filtered);
+  };
+
+  // Show less filtered transactions
+  window.showLessFiltered = function() {
+    const filtered = window.filteredTransactions || window.allUserTransactions;
+    const currentCount = window.displayedTxCount;
+    const newCount = Math.max(currentCount - 25, 25);
+
+    const container = document.getElementById('transaction-list');
+    container.innerHTML = '';
+    renderTransactions(filtered.slice(0, newCount), container);
+    window.displayedTxCount = newCount;
+    updatePaginationButtonsFiltered(container, filtered);
+  };
 
   // Abbreviate address for display
   function abbreviateAddress(address) {

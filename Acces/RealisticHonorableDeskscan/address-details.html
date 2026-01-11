@@ -2248,17 +2248,33 @@
         }
 
         // Load address transactions
-        async function loadAddressTransactions(address) {
+        let currentPage = 1;
+        let allLoadedTransactions = [];
+        let paginationInfo = null;
+
+        async function loadAddressTransactions(address, page = 1, append = false) {
             try {
-                console.log('🔍 Fetching transactions for address:', address);
-                const response = await fetch(`/api/explorer/address/${address}`);
+                console.log('🔍 Fetching transactions for address:', address, 'page:', page);
+                const response = await fetch(`/api/explorer/address/${address}?page=${page}&limit=25`);
                 const data = await response.json();
 
                 console.log('📦 Transactions data received:', data);
 
-                if (data.success && data.data && data.data.transactions && data.data.transactions.length > 0) {
-                    displayTransactions(data.data.transactions, address);
-                    updateTransactionStats(data.data.transactions, address);
+                if (data.success && data.data) {
+                    paginationInfo = data.data.pagination;
+                    
+                    if (data.data.transactions && data.data.transactions.length > 0) {
+                        if (append) {
+                            allLoadedTransactions = [...allLoadedTransactions, ...data.data.transactions];
+                        } else {
+                            allLoadedTransactions = data.data.transactions;
+                        }
+                        displayTransactions(allLoadedTransactions, address);
+                        updateTransactionStats(null, address, data.data);
+                        updateShowMoreButton();
+                    } else if (!append) {
+                        showNoTransactions();
+                    }
                 } else {
                     showNoTransactions();
                 }
@@ -2266,6 +2282,36 @@
                 console.error('Error loading transactions:', error);
                 showTransactionError();
             }
+        }
+
+        function updateShowMoreButton() {
+            const container = document.getElementById('addressTransactions');
+            const existingBtn = document.getElementById('showMoreBtn');
+            
+            if (existingBtn) {
+                existingBtn.remove();
+            }
+
+            if (paginationInfo && paginationInfo.hasMore) {
+                const btnHtml = `
+                    <div id="showMoreBtn" style="text-align: center; padding: 20px;">
+                        <button onclick="loadMoreTransactions()" style="padding: 12px 30px; background: #7c3aed; color: #ffffff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);">
+                            ⇆ Show More (${allLoadedTransactions.length} of ${paginationInfo.totalTransactions})
+                        </button>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', btnHtml);
+            }
+        }
+
+        async function loadMoreTransactions() {
+            currentPage++;
+            const btn = document.querySelector('#showMoreBtn button');
+            if (btn) {
+                btn.textContent = '⏳ Loading...';
+                btn.disabled = true;
+            }
+            await loadAddressTransactions(currentAddress, currentPage, true);
         }
 
         // Display transactions
@@ -2350,10 +2396,27 @@
         }
 
         // Update transaction statistics
-        function updateTransactionStats(transactions, address) {
+        function updateTransactionStats(transactions, address, apiData = null) {
+            // إذا كان لدينا بيانات من API، استخدمها مباشرة
+            if (apiData && apiData.pagination) {
+                document.getElementById('addressTxCount').textContent = apiData.pagination.totalTransactions.toLocaleString();
+                
+                // تحويل القيم من Wei إلى ACCESS
+                let totalSent = apiData.totalSent || 0;
+                let totalReceived = apiData.totalReceived || 0;
+                
+                if (totalSent > 1000000) totalSent = totalSent / 1e18;
+                if (totalReceived > 1000000) totalReceived = totalReceived / 1e18;
+                
+                document.getElementById('addressTotalSent').textContent = totalSent.toFixed(8);
+                document.getElementById('addressTotalReceived').textContent = totalReceived.toFixed(8);
+                return;
+            }
+
+            // Fallback: حساب من المعاملات المحلية
             let totalSent = 0;
             let totalReceived = 0;
-            let txCount = transactions.length;
+            let txCount = transactions ? transactions.length : 0;
 
             transactions.forEach(tx => {
                 // ⭐ FIX: Convert value correctly from Wei/String to ACCESS

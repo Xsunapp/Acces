@@ -642,8 +642,9 @@
         .stat-icon.transactions { background: none; color: var(--text-secondary); }
         .stat-icon.block { background: none; color: var(--text-secondary); }
 
-        /* Fix block icon background in Latest Blocks section - blue in light mode */
-        .list-item .fa-cube {
+        /* Block icon in Latest Blocks section - blue in light mode */
+        .list-item .fa-cube,
+        .block-icon-box {
             background: #3b82f6 !important;
             color: white !important;
             padding: 8px;
@@ -651,7 +652,8 @@
         }
 
         /* Purple in dark mode */
-        [data-theme="dark"] .list-item .fa-cube {
+        [data-theme="dark"] .list-item .fa-cube,
+        [data-theme="dark"] .block-icon-box {
             background: #8b5cf6 !important;
             color: white !important;
         }
@@ -3229,7 +3231,7 @@
                     <div class="list-item" style="cursor: pointer;" onclick="showRealBlockDetails(${blockNumber}, '${blockHash}')">
                         <div class="tx-details">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <div style="width: 32px; height: 32px; background: var(--accent-purple); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold;">
+                                <div class="block-icon-box" style="width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">
                                     <i class="fas fa-cube"></i>
                                 </div>
                                 <div>
@@ -3376,7 +3378,6 @@
             const query = document.getElementById('searchInput').value.trim();
 
             if (!query) {
-                alert('Please enter a search query');
                 return;
             }
 

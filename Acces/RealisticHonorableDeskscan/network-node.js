@@ -3582,17 +3582,21 @@ class NetworkNode {
       const gasPriceInAccess = parseFloat(transaction.gasPrice || 0.00002);
       const txHash = transaction.hash || transaction.txId;
 
+      // استخراج التوقيع من المعاملة
+      const signature = transaction.signature || transaction.sig || null;
+
       await pool.query(`
         INSERT INTO transactions
         (tx_hash, hash, from_address, to_address, amount, timestamp, block_hash, block_index,
-         nonce, gas_used, gas_price, chain_id, network_id, is_confirmed, confirmations)
-        VALUES ($1, $1, $2, $3, $4::numeric(20,8), $5, $6, $7, $8, $9, $10::numeric(20,8), $11, $12, $13, $14)
+         nonce, gas_used, gas_price, chain_id, network_id, is_confirmed, confirmations, signature)
+        VALUES ($1, $1, $2, $3, $4::numeric(20,8), $5, $6, $7, $8, $9, $10::numeric(20,8), $11, $12, $13, $14, $15)
         ON CONFLICT (tx_hash) DO UPDATE SET
         hash = EXCLUDED.hash,
         is_confirmed = EXCLUDED.is_confirmed,
         confirmations = EXCLUDED.confirmations,
         block_hash = EXCLUDED.block_hash,
-        block_index = EXCLUDED.block_index
+        block_index = EXCLUDED.block_index,
+        signature = COALESCE(EXCLUDED.signature, transactions.signature)
       `, [
         txHash,
         transaction.fromAddress || transaction.from,
@@ -3607,7 +3611,8 @@ class NetworkNode {
         '0x5968',
         '22888',
         true, // is_confirmed
-        transaction.confirmations || 1
+        transaction.confirmations || 1,
+        signature
       ]);
 
       console.log(`💾 Confirmed transaction saved to database: ${txHash} (gas: ${gasPriceInAccess.toFixed(8)} ACCESS)`);
@@ -3666,17 +3671,21 @@ class NetworkNode {
       // تحويل gasPrice إلى wei (رقم صحيح) بدلاً من ACCESS (عشري)
       const gasPriceInWei = Math.floor((parseFloat(transaction.gasPrice || transaction.gasFee || 0.00002)) * 1e18);
 
+      // استخراج التوقيع من المعاملة
+      const signature = transaction.signature || transaction.sig || null;
+
       await pool.query(`
         INSERT INTO transactions
         (tx_hash, hash, from_address, to_address, amount, timestamp, nonce, gas_used, gas_price,
-         chain_id, network_id, is_external, transaction_type, status)
-        VALUES ($1, $1, $2, $3, $4::numeric(20,8), $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         chain_id, network_id, is_external, transaction_type, status, signature)
+        VALUES ($1, $1, $2, $3, $4::numeric(20,8), $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (tx_hash) DO UPDATE SET
         hash = EXCLUDED.hash,
         from_address = EXCLUDED.from_address,
         to_address = EXCLUDED.to_address,
         amount = EXCLUDED.amount,
-        timestamp = EXCLUDED.timestamp
+        timestamp = EXCLUDED.timestamp,
+        signature = COALESCE(EXCLUDED.signature, transactions.signature)
       `, [
         txHash,
         fromAddress.toLowerCase(),
@@ -3690,7 +3699,8 @@ class NetworkNode {
         '22888',
         transaction.external || false,
         'transfer',
-        'pending'
+        'pending',
+        signature
       ]);
 
       console.log(`💾 Transaction saved to database: ${txHash} (${amount.toFixed(8)} ACCESS, gas: ${gasPriceInWei} wei)`);
@@ -3951,18 +3961,21 @@ class NetworkNode {
       const safeGasUsed = Math.max(21000, Math.min(gasUsedValue, 2147483647)); // INTEGER range
       const safeGasPrice = Math.max(0.00000001, Math.min(gasPriceValue, 99.99999999)); // NUMERIC(20,8) safe range
 
+      // استخراج التوقيع من المعاملة
+      const signature = transaction.signature || transaction.sig || null;
 
       await pool.query(`
         INSERT INTO transactions
         (tx_hash, from_address, to_address, amount, timestamp, block_hash, block_index,
-         gas_used, gas_price, chain_id, network_id, is_external)
-        VALUES ($1, $2, $3, $4::numeric(20,8), $5, $6, $7, $8, $9::numeric(20,8), $10, $11, $12)
+         gas_used, gas_price, chain_id, network_id, is_external, signature)
+        VALUES ($1, $2, $3, $4::numeric(20,8), $5, $6, $7, $8, $9::numeric(20,8), $10, $11, $12, $13)
         ON CONFLICT (tx_hash) DO UPDATE SET
         from_address = EXCLUDED.from_address,
         to_address = EXCLUDED.to_address,
         amount = EXCLUDED.amount,
         timestamp = EXCLUDED.timestamp,
-        is_external = EXCLUDED.is_external
+        is_external = EXCLUDED.is_external,
+        signature = COALESCE(EXCLUDED.signature, transactions.signature)
       `, [
         transaction.hash,
         fromAddress,
@@ -3975,7 +3988,8 @@ class NetworkNode {
         parseFloat(safeGasPrice).toFixed(8), // استخدام القيمة العشرية الآمنة في ACCESS
         '0x5968',
         '22888',
-        true // علامة للمعاملات الخارجية
+        true, // علامة للمعاملات الخارجية
+        signature
       ]);
 
       console.log(`📝 External transaction saved: ${transaction.hash} (${amount.toFixed(8)} ACCESS, gas: ${safeGasPrice.toFixed(8)} ACCESS)`);

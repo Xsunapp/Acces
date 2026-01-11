@@ -1277,6 +1277,154 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // POST /api/push/test-subscription - Test if subscription is still valid (auto-cleanup invalid ones)
+    if (pathname === '/api/push/test-subscription' && req.method === 'POST') {
+      try {
+        const { userId, endpoint } = await parseRequestBody(req);
+        
+        if (!endpoint) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, valid: false, error: 'endpoint required' }));
+          return;
+        }
+
+        // Check if subscription exists in database
+        const subResult = await pool.query(
+          'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE endpoint = $1 AND revoked_at IS NULL',
+          [endpoint]
+        );
+
+        if (subResult.rows.length === 0) {
+          // Subscription not in database - needs re-subscription
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, valid: false, reason: 'not_found' }));
+          return;
+        }
+
+        const sub = subResult.rows[0];
+        
+        // Try to send a silent test notification to verify subscription validity
+        try {
+          const subscription = {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth }
+          };
+          
+          // Send minimal test payload
+          const testPayload = JSON.stringify({ 
+            type: 'test', 
+            silent: true, 
+            timestamp: Date.now() 
+          });
+          
+          await webpush.sendNotification(subscription, testPayload);
+          
+          // Subscription is valid - update last verified time
+          await pool.query(
+            'UPDATE push_subscriptions SET updated_at = NOW() WHERE endpoint = $1',
+            [endpoint]
+          );
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, valid: true }));
+          
+        } catch (pushError) {
+          console.log(`📱 [PUSH-TEST] Subscription test failed: ${pushError.statusCode} - ${pushError.message}`);
+          
+          // If subscription is invalid (410 Gone, 404, or 403), DELETE it and notify client
+          if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
+            await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+            console.log(`📱 [PUSH-TEST] 🗑️ Auto-deleted invalid subscription (${pushError.statusCode}) - client will auto-resubscribe`);
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+              success: true, 
+              valid: false, 
+              reason: 'expired',
+              statusCode: pushError.statusCode,
+              autoResubscribe: true 
+            }));
+          } else {
+            // Other error - might be temporary, don't delete
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+              success: true, 
+              valid: true, // Assume valid for temporary errors
+              warning: 'temporary_error',
+              statusCode: pushError.statusCode
+            }));
+          }
+        }
+        return;
+      } catch (error) {
+        console.error('Error testing push subscription:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, valid: false, error: error.message }));
+        return;
+      }
+    }
+
+    // POST /api/push/cleanup - Force cleanup of invalid subscriptions (admin/cron endpoint)
+    if (pathname === '/api/push/cleanup' && req.method === 'POST') {
+      try {
+        console.log('🧹 [PUSH-CLEANUP] Starting forced cleanup...');
+        
+        // Get all active subscriptions
+        const allSubs = await pool.query(
+          'SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE revoked_at IS NULL'
+        );
+        
+        let validCount = 0;
+        let invalidCount = 0;
+        let deletedEndpoints = [];
+        
+        for (const sub of allSubs.rows) {
+          try {
+            const subscription = {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth }
+            };
+            
+            // Try sending test notification
+            await webpush.sendNotification(subscription, JSON.stringify({ type: 'cleanup-test', silent: true }));
+            validCount++;
+            
+            // Update last verified time
+            await pool.query('UPDATE push_subscriptions SET updated_at = NOW() WHERE id = $1', [sub.id]);
+            
+          } catch (pushError) {
+            if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
+              // Invalid subscription - delete it
+              await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
+              invalidCount++;
+              deletedEndpoints.push(sub.endpoint.substring(0, 50) + '...');
+              console.log(`🧹 [PUSH-CLEANUP] Deleted invalid (${pushError.statusCode})`);
+            } else {
+              // Temporary error - keep it
+              validCount++;
+            }
+          }
+        }
+        
+        console.log(`🧹 [PUSH-CLEANUP] Complete: ${validCount} valid, ${invalidCount} deleted`);
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: true, 
+          total: allSubs.rows.length,
+          valid: validCount,
+          deleted: invalidCount,
+          message: `Cleaned ${invalidCount} invalid subscriptions`
+        }));
+        return;
+      } catch (error) {
+        console.error('Error in push cleanup:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: error.message }));
+        return;
+      }
+    }
+
     // ========== ACTIVITY AD CONFIGURATION ENDPOINT (مستقل عن Boost) ==========
     
     // GET /api/ad-config - إرسال معرف الإعلان للواجهة الأمامية

@@ -591,6 +591,14 @@
     background: rgba(107, 165, 231, 0.2);
   }
 
+  /* Connect Wallet Wrapper - Light mode separator line */
+  .connect-wallet-wrapper {
+    border-top: 1px solid #e2e8f0 !important;
+  }
+
+  .dark-theme .connect-wallet-wrapper {
+    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+  }
 
 
   /* Strong color for balance like in the image */
@@ -1511,8 +1519,6 @@
 /* Dark theme action buttons */
 .dark-theme .action-button {
   background: #667eea !important;
-  background: -webkit-linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 
 .dark-theme .action-button:hover {

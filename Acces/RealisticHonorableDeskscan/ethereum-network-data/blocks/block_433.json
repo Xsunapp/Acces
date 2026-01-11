@@ -65,9 +65,9 @@
   ],
   "previousHash": "2e0bf4c41e1ac184a0f0f0e0a67d8aba7df9cac77c5d956a89208a5b69e07e85",
   "nonce": 0,
-  "hash": "3f7fc6e3e0a0b5d7793722e88f9dcc71d35cbd62148964134d7bd5405d16e3f2",
+  "hash": "e990911f37f8651a6d510431569d1ddf0059cac67212c495793f220ab0fb6912",
   "merkleRoot": "0508d92c2096e639e860daf4f2b452d2d8f72de53d5e0a50564ef20a5620ef18",
   "persistentHash": "a1d91bf447f65a4a519ec8f913b035043d13c07981c1dcd4ef5a10ceb00f0899",
-  "savedAt": 1767905412883,
+  "savedAt": 1768143414510,
   "ethereumStyle": true
 }

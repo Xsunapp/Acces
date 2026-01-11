@@ -149,6 +149,8 @@ class AccessNotificationSystem {
       // إذا كان الإذن ممنوح سابقاً، نعيد الاشتراك تلقائياً كل مرة
       if (this.permission === 'granted') {
         await this.autoResubscribe();
+        // 🔄 Start background health check for subscription validity
+        this.startSubscriptionHealthCheck();
       }
       
       return true;
@@ -159,6 +161,7 @@ class AccessNotificationSystem {
   }
 
   // 🔔 FACEBOOK/INSTAGRAM STYLE: إعادة الاشتراك التلقائية الذكية
+  // Auto-resubscribe silently without user intervention - like major apps do
   async autoResubscribe() {
     try {
       if (!this.registration || !this.userId) {
@@ -170,36 +173,70 @@ class AccessNotificationSystem {
       
       if (currentSub) {
         // اختبار صلاحية الاشتراك عبر السيرفر
-        const testResponse = await fetch('/api/push/test-subscription', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: this.userId,
-            endpoint: currentSub.endpoint
-          })
-        });
-        
-        const testResult = await testResponse.json();
-        
-        if (testResult.valid) {
-          console.log('✅ Push subscription is still valid');
+        try {
+          const testResponse = await fetch('/api/push/test-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: this.userId,
+              endpoint: currentSub.endpoint
+            })
+          });
+          
+          const testResult = await testResponse.json();
+          
+          if (testResult.valid) {
+            console.log('✅ Push subscription is still valid');
+            this.pushSubscription = currentSub;
+            return true;
+          }
+          
+          // 🔄 AUTO-CLEANUP: الاشتراك منتهي - السيرفر حذفه تلقائياً
+          console.log(`⚠️ Push subscription expired (reason: ${testResult.reason}), auto-resubscribing...`);
+          
+          // إلغاء الاشتراك القديم من المتصفح أيضاً
+          try {
+            await currentSub.unsubscribe();
+            console.log('🗑️ Old browser subscription cleared');
+          } catch (unsubErr) {
+            console.log('Could not unsubscribe old:', unsubErr.message);
+          }
+          
+        } catch (testError) {
+          // Network error - assume valid to avoid unnecessary resubscribe
+          console.log('⚠️ Could not test subscription (network):', testError.message);
           this.pushSubscription = currentSub;
           return true;
         }
-        
-        console.log('⚠️ Push subscription expired/invalid, auto-resubscribing...');
       }
 
-      // إعادة الاشتراك تلقائياً
-      await this.subscribeToWebPush();
-      console.log('🔔 Auto-resubscribed to push notifications (Facebook/Instagram style)');
-      return true;
+      // إعادة الاشتراك تلقائياً - بدون أي تدخل من المستخدم
+      const success = await this.subscribeToWebPush();
+      if (success) {
+        console.log('🔔 Auto-resubscribed to push notifications (Facebook/Instagram style)');
+      }
+      return success;
       
     } catch (error) {
       console.error('Auto-resubscribe error:', error);
       // محاولة الاشتراك العادي كـ fallback
       return await this.subscribeToWebPush();
     }
+  }
+
+  // 🔄 Background subscription health check - runs periodically
+  startSubscriptionHealthCheck() {
+    // Check subscription health every 6 hours
+    const SIX_HOURS = 6 * 60 * 60 * 1000;
+    
+    setInterval(async () => {
+      if (this.permission === 'granted') {
+        console.log('🔍 Running subscription health check...');
+        await this.autoResubscribe();
+      }
+    }, SIX_HOURS);
+    
+    console.log('🔄 Subscription health check enabled (every 6 hours)');
   }
 
   // Subscribe to Web Push notifications (like YouTube)

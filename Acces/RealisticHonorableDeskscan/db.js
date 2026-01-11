@@ -713,7 +713,8 @@ async function initializeDatabase() {
         is_external BOOLEAN DEFAULT false,
         is_confirmed BOOLEAN DEFAULT true,
         transaction_type VARCHAR(20) DEFAULT 'transfer',
-        input TEXT
+        input TEXT,
+        signature VARCHAR(132)
       )
     `);
 
@@ -730,6 +731,7 @@ async function initializeDatabase() {
       await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sender_address TEXT`);
       await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recipient_address TEXT`);
       await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS input TEXT`);
+      await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS signature VARCHAR(132)`);
       console.log('Added missing columns to transactions table');
     } catch (err) {
       console.log('Columns already exist or error occurred:', err.message);

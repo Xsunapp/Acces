@@ -1,7 +1,7 @@
 // Service Worker for Push Notifications ONLY
 // No caching, no offline storage - notifications only
 
-const SW_VERSION = '6.2.8';
+const SW_VERSION = '6.5.8';
 
 // Transaction notification translations
 const NOTIFICATION_TRANSLATIONS = {
@@ -185,6 +185,15 @@ self.addEventListener('push', (event) => {
   } catch (e) {
     console.error('Error parsing push data:', e);
     return; // Don't show notification if data is invalid
+  }
+
+  // 🔇 SILENT NOTIFICATIONS - for subscription testing/cleanup (no visible notification)
+  if (data.silent === true || 
+      data.type === 'test' || 
+      data.type === 'cleanup-test' || 
+      data.type === 'cleanup-ping') {
+    console.log('Silent test/cleanup push - no notification shown');
+    return;
   }
 
   // Don't show notification if no meaningful content

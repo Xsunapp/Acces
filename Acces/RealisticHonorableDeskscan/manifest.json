@@ -3,7 +3,7 @@
   "name": "AccessDigital",
   "short_name": "Access Chain",
   "description": "Digital engagement rewards platform",
-  "start_url": "./index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#000000",
@@ -51,22 +51,6 @@
       "description": "Start Activity",
       "url": "/?page=activity",
       "icons": [{ "src": "access-store-192.png", "sizes": "192x192" }]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Access Digital Dashboard"
-    },
-    {
-      "src": "screenshot-mobile.png",
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Access Digital Mobile View"
     }
   ]
 }

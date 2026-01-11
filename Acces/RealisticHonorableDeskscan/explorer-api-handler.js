@@ -244,8 +244,38 @@ async function handleProxyModule(params) {
 
         case 'access_getBlockByNumber':
         case 'eth_getBlockByNumber':
-            const blockNum = parseInt(tag, 16);
-            const block = networkNode.network.getBlockByIndex(blockNum);
+            // دعم كلا الصيغتين: hex (0x...) و عشري
+            let blockNum;
+            if (tag && tag.startsWith('0x')) {
+                blockNum = parseInt(tag, 16);
+            } else {
+                blockNum = parseInt(tag, 10);
+            }
+            
+            let block = networkNode.network.getBlockByIndex(blockNum);
+            
+            // إذا لم يوجد البلوك، حاول البحث في قاعدة البيانات
+            if (!block) {
+                try {
+                    const dbResult = await pool.query(
+                        'SELECT DISTINCT block_index, block_hash, timestamp FROM transactions WHERE block_index = $1',
+                        [blockNum]
+                    );
+                    if (dbResult.rows.length > 0) {
+                        const row = dbResult.rows[0];
+                        block = {
+                            index: row.block_index,
+                            hash: row.block_hash || `0x${row.block_index.toString(16).padStart(64, '0')}`,
+                            timestamp: new Date(row.timestamp).getTime(),
+                            transactions: [],
+                            difficulty: 1
+                        };
+                    }
+                } catch (dbError) {
+                    console.log('Database lookup failed:', dbError.message);
+                }
+            }
+            
             if (!block) {
                 throw new Error('Block not found');
             }
@@ -558,26 +588,32 @@ async function handleTransactionDetails(req, res, txHash) {
         // البحث في قاعدة البيانات
         if (!transaction) {
             const result = await pool.query(
-                'SELECT * FROM transactions WHERE tx_hash = $1',
+                'SELECT * FROM transactions WHERE tx_hash = $1 OR hash = $1',
                 [txHash]
             );
 
             if (result.rows.length > 0) {
                 const row = result.rows[0];
                 transaction = {
-                    hash: row.tx_hash,
+                    hash: row.tx_hash || row.hash,
                     from: row.from_address,
                     to: row.to_address,
                     value: row.amount,
                     timestamp: Math.floor(row.timestamp / 1000),
                     blockNumber: row.block_index,
                     blockHash: row.block_hash,
-                    gasPrice: networkNode ? networkNode.network.getGasPrice() : 0.000000001,
-                    gasUsed: 21000,
-                    gasLimit: 21000,
-                    nonce: 0,
+                    gasPrice: row.gas_price || (networkNode ? networkNode.network.getGasPrice() : 0.000000001),
+                    gasUsed: row.gas_used || 21000,
+                    gasLimit: row.gas_used || 21000,
+                    nonce: row.nonce || 0,
                     transactionIndex: 0,
-                    status: 'success'
+                    status: row.status || 'success',
+                    signature: row.signature || null,
+                    chainId: row.chain_id || '0x5968',
+                    networkId: row.network_id || '22888',
+                    isExternal: row.is_external || false,
+                    isConfirmed: row.is_confirmed !== false,
+                    confirmations: row.confirmations || 1
                 };
             }
         }
@@ -622,32 +658,48 @@ async function handleTransactionDetails(req, res, txHash) {
 // تفاصيل العنوان
 async function handleAddressDetails(req, res, address) {
     try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const page = parseInt(url.searchParams.get('page')) || 1;
+        const limit = parseInt(url.searchParams.get('limit')) || 25;
+        const offset = (page - 1) * limit;
+
         const networkNode = getNetworkNode();
         const balance = networkNode ? networkNode.network.getBalance(address) : 0;
 
-        // الحصول على المعاملات
-        const transactions = await getTransactionsByAddress(address);
+        // الحصول على جميع المعاملات (بدون limit) لحساب الإحصائيات
+        const allTransactions = await getTransactionsByAddress(address);
 
-        // حساب الإحصائيات
-        const totalSent = transactions
+        // حساب الإحصائيات من جميع المعاملات
+        const totalSent = allTransactions
             .filter(tx => tx.from && tx.from.toLowerCase() === address.toLowerCase())
             .reduce((sum, tx) => sum + parseFloat(tx.value || 0), 0);
 
-        const totalReceived = transactions
+        const totalReceived = allTransactions
             .filter(tx => tx.to && tx.to.toLowerCase() === address.toLowerCase())
             .reduce((sum, tx) => sum + parseFloat(tx.value || 0), 0);
+
+        // تقسيم المعاملات حسب الصفحة
+        const paginatedTransactions = allTransactions.slice(offset, offset + limit);
+        const totalPages = Math.ceil(allTransactions.length / limit);
 
         const addressInfo = {
             address: address,
             balance: balance,
             balanceUSD: balance * 0.001,
-            transactionCount: transactions.length,
+            transactionCount: allTransactions.length,
             totalSent: totalSent,
             totalReceived: totalReceived,
-            firstSeen: transactions.length > 0 ? Math.min(...transactions.map(tx => tx.timestamp)) : null,
-            lastSeen: transactions.length > 0 ? Math.max(...transactions.map(tx => tx.timestamp)) : null,
+            firstSeen: allTransactions.length > 0 ? Math.min(...allTransactions.map(tx => tx.timestamp)) : null,
+            lastSeen: allTransactions.length > 0 ? Math.max(...allTransactions.map(tx => tx.timestamp)) : null,
             isContract: false,
-            transactions: transactions.slice(0, 25)
+            transactions: paginatedTransactions,
+            pagination: {
+                page: page,
+                limit: limit,
+                totalPages: totalPages,
+                totalTransactions: allTransactions.length,
+                hasMore: page < totalPages
+            }
         };
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

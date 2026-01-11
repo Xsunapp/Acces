@@ -61,7 +61,7 @@
 
         .container {
             max-width: 500px;
-            margin: 40px auto;
+            margin: 15px auto;
             background: #1a1a1a;
             border-radius: 20px;
             overflow: hidden;
@@ -78,7 +78,7 @@
 
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
+            padding: 15px 20px;
             text-align: center;
             color: white;
             position: relative;
@@ -111,13 +111,13 @@
         }
 
         .content {
-            padding: 30px;
+            padding: 8px 20px 15px 20px;
         }
 
         .network-info {
             background: #2a2a2a;
             border-radius: 15px;
-            padding: 20px;
+            padding: 15px;
             margin-bottom: 25px;
             transition: all 0.3s ease;
         }
@@ -206,55 +206,67 @@
         }
 
         .wallet-btn {
-            background: #2a2a2a;
-            border: 2px solid #444;
-            border-radius: 15px;
-            padding: 20px 15px;
-            text-align: center;
+            background: linear-gradient(135deg, #3898FF 0%, #1E7AE5 100%);
+            border: none;
+            border-radius: 12px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             text-decoration: none;
             color: #ffffff;
+            box-shadow: 0 4px 14px rgba(56, 152, 255, 0.4);
         }
 
         body.light-mode .wallet-btn {
-            background: white;
-            border: 2px solid #e9ecef;
-            color: #495057;
+            background: linear-gradient(135deg, #3898FF 0%, #1E7AE5 100%);
+            color: #ffffff;
         }
 
         .wallet-btn:hover {
-            border-color: #667eea;
-            background: #333;
+            background: linear-gradient(135deg, #4BA3FF 0%, #2B8AF0 100%);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 6px 20px rgba(56, 152, 255, 0.5);
+        }
+
+        .wallet-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(56, 152, 255, 0.4);
         }
 
         body.light-mode .wallet-btn:hover {
-            background: #f8f9ff;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.1);
+            background: linear-gradient(135deg, #4BA3FF 0%, #2B8AF0 100%);
+            box-shadow: 0 6px 20px rgba(56, 152, 255, 0.5);
         }
 
         .wallet-icon {
-            font-size: 1.5rem;
-            color: #667eea;
-            margin-bottom: 8px;
+            font-size: 1.4rem;
+            color: #ffffff;
+        }
+
+        .wallet-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         .wallet-name {
             font-weight: 600;
-            font-size: 0.9rem;
-            margin-bottom: 3px;
+            font-size: 1rem;
+            color: #ffffff;
         }
 
         .wallet-desc {
             font-size: 0.75rem;
-            color: #b0b0b0;
+            color: rgba(255, 255, 255, 0.85);
             transition: all 0.3s ease;
         }
 
         body.light-mode .wallet-desc {
-            color: #6c757d;
+            color: rgba(255, 255, 255, 0.85);
         }
 
         .manual-btn {
@@ -319,9 +331,9 @@
         }
 
         .status-message {
-            padding: 12px 15px;
+            padding: 10px 15px;
             border-radius: 10px;
-            margin: 15px 0;
+            margin: 0 0 10px 0;
             display: none;
             text-align: center;
             font-size: 0.9rem;
@@ -449,9 +461,6 @@
             <button class="theme-toggle" onclick="toggleTheme()">
                 <i class="fas fa-moon theme-icon"></i>
             </button>
-            <div class="logo">
-                <img src="logo.png" alt="Access Network">
-            </div>
             <div class="title">Access Network</div>
             <div class="subtitle">Add to your wallet</div>
         </div>
@@ -514,10 +523,12 @@
             <div class="wallet-options">
                 <div class="wallet-btn" onclick="connectBrowserWallet()">
                     <div class="wallet-icon">
-                        <i class="fab fa-firefox-browser"></i>
+                        <i class="fas fa-wallet"></i>
                     </div>
-                    <div class="wallet-name">Browser Wallet</div>
-                    <div class="wallet-desc">MetaMask, Trust Wallet</div>
+                    <div class="wallet-text">
+                        <div class="wallet-name">Connect Wallet</div>
+                        <div class="wallet-desc">MetaMask, Trust Wallet, Coinbase</div>
+                    </div>
                 </div>
             </div>
 
@@ -603,15 +614,19 @@
         }
 
         async function connectBrowserWallet() {
+            // Check if we're on mobile
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            
             if (typeof window.ethereum !== 'undefined') {
-                showStatus('Connecting to browser wallet...', 'info');
+                // Desktop browser with wallet extension OR in-app browser
+                showStatus('Connecting to wallet...', 'info');
                 try {
                     await window.ethereum.request({
                         method: 'wallet_addEthereumChain',
                         params: [accessNetwork]
                     });
 
-                    showStatus('Access Network added successfully!', 'success');
+                    showStatus('✅ Access Network added successfully!', 'success');
 
                     setTimeout(async () => {
                         try {
@@ -619,7 +634,7 @@
                                 method: 'wallet_switchEthereumChain',
                                 params: [{ chainId: accessNetwork.chainId }]
                             });
-                            showStatus('Successfully switched to Access Network!', 'success');
+                            showStatus('✅ Successfully switched to Access Network!', 'success');
                         } catch (error) {
                             console.log('Network switch not performed automatically');
                         }
@@ -628,13 +643,263 @@
                 } catch (error) {
                     console.error('Error adding network:', error);
                     if (error.code === 4001) {
-                        showStatus('Request rejected by user', 'error');
+                        showStatus('❌ Request rejected by user', 'error');
                     } else {
-                        showStatus('Failed to add network, try manual method', 'error');
+                        showStatus('❌ Failed to add network, try manual method', 'error');
                     }
                 }
+            } else if (isMobile) {
+                // Mobile browser without wallet - show wallet selection
+                showWalletSelector();
             } else {
-                showStatus('No wallet installed, please install MetaMask or another wallet', 'error');
+                // Desktop without wallet extension
+                showStatus('⚠️ No wallet detected. Please install MetaMask extension or use the mobile app.', 'error');
+                showWalletSelector();
+            }
+        }
+
+        function showWalletSelector() {
+            // Get the current page URL for deep linking
+            const currentUrl = encodeURIComponent(window.location.href);
+            
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.id = 'wallet-modal';
+            modal.innerHTML = `
+                <div class="wallet-modal-overlay" onclick="closeWalletModal()">
+                    <div class="wallet-modal-content" onclick="event.stopPropagation()">
+                        <div class="wallet-modal-header">
+                            <h3><i class="fas fa-wallet"></i> Select Wallet</h3>
+                            <button class="modal-close" onclick="closeWalletModal()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="wallet-modal-body">
+                            <p class="wallet-modal-desc">Choose your wallet to add Access Network</p>
+                            
+                            <a href="https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}" class="wallet-option" onclick="closeWalletModal()">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" class="wallet-logo">
+                                <div class="wallet-option-info">
+                                    <span class="wallet-option-name">MetaMask</span>
+                                    <span class="wallet-option-desc">Open in MetaMask app</span>
+                                </div>
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            
+                            <a href="https://link.trustwallet.com/open_url?coin_id=60&url=${currentUrl}" class="wallet-option" onclick="closeWalletModal()">
+                                <img src="https://trustwallet.com/assets/images/media/assets/TWT.png" alt="Trust Wallet" class="wallet-logo">
+                                <div class="wallet-option-info">
+                                    <span class="wallet-option-name">Trust Wallet</span>
+                                    <span class="wallet-option-desc">Open in Trust Wallet app</span>
+                                </div>
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            
+                            <a href="https://go.cb-w.com/dapp?cb_url=${currentUrl}" class="wallet-option" onclick="closeWalletModal()">
+                                <img src="https://altcoinsbox.com/wp-content/uploads/2022/12/coinbase-wallet-logo.png" alt="Coinbase" class="wallet-logo">
+                                <div class="wallet-option-info">
+                                    <span class="wallet-option-name">Coinbase Wallet</span>
+                                    <span class="wallet-option-desc">Open in Coinbase app</span>
+                                </div>
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            
+                            <div class="wallet-divider">
+                                <span>or install a wallet</span>
+                            </div>
+                            
+                            <div class="install-options">
+                                <a href="https://metamask.io/download/" target="_blank" class="install-btn">
+                                    <i class="fas fa-download"></i> Install MetaMask
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal styles if not already added
+            if (!document.getElementById('wallet-modal-styles')) {
+                const styles = document.createElement('style');
+                styles.id = 'wallet-modal-styles';
+                styles.textContent = `
+                    .wallet-modal-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.8);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 9999;
+                        padding: 20px;
+                        animation: fadeIn 0.2s ease;
+                    }
+                    @keyframes fadeIn {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    .wallet-modal-content {
+                        background: #1a1a1a;
+                        border-radius: 20px;
+                        width: 100%;
+                        max-width: 400px;
+                        max-height: 90vh;
+                        overflow-y: auto;
+                        border: 1px solid #333;
+                        animation: slideUp 0.3s ease;
+                    }
+                    body.light-mode .wallet-modal-content {
+                        background: #ffffff;
+                        border: 1px solid #e9ecef;
+                    }
+                    @keyframes slideUp {
+                        from { transform: translateY(20px); opacity: 0; }
+                        to { transform: translateY(0); opacity: 1; }
+                    }
+                    .wallet-modal-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 20px;
+                        border-bottom: 1px solid #333;
+                    }
+                    body.light-mode .wallet-modal-header {
+                        border-bottom: 1px solid #e9ecef;
+                    }
+                    .wallet-modal-header h3 {
+                        color: #fff;
+                        font-size: 1.1rem;
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                    }
+                    body.light-mode .wallet-modal-header h3 {
+                        color: #333;
+                    }
+                    .modal-close {
+                        background: transparent;
+                        border: none;
+                        color: #888;
+                        font-size: 1.2rem;
+                        cursor: pointer;
+                        padding: 5px;
+                        transition: color 0.2s;
+                    }
+                    .modal-close:hover {
+                        color: #fff;
+                    }
+                    body.light-mode .modal-close:hover {
+                        color: #333;
+                    }
+                    .wallet-modal-body {
+                        padding: 20px;
+                    }
+                    .wallet-modal-desc {
+                        color: #888;
+                        text-align: center;
+                        margin-bottom: 20px;
+                        font-size: 0.9rem;
+                    }
+                    .wallet-option {
+                        display: flex;
+                        align-items: center;
+                        padding: 15px;
+                        background: #2a2a2a;
+                        border-radius: 12px;
+                        margin-bottom: 10px;
+                        text-decoration: none;
+                        color: #fff;
+                        transition: all 0.2s ease;
+                        border: 1px solid transparent;
+                    }
+                    body.light-mode .wallet-option {
+                        background: #f8f9fa;
+                        color: #333;
+                    }
+                    .wallet-option:hover {
+                        background: #333;
+                        border-color: #3898FF;
+                        transform: translateX(5px);
+                    }
+                    body.light-mode .wallet-option:hover {
+                        background: #e9ecef;
+                    }
+                    .wallet-logo {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 10px;
+                        margin-right: 15px;
+                    }
+                    .wallet-option-info {
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    .wallet-option-name {
+                        font-weight: 600;
+                        font-size: 1rem;
+                    }
+                    .wallet-option-desc {
+                        font-size: 0.8rem;
+                        color: #888;
+                    }
+                    .wallet-option i.fa-chevron-right {
+                        color: #888;
+                    }
+                    .wallet-divider {
+                        display: flex;
+                        align-items: center;
+                        margin: 20px 0;
+                        color: #666;
+                        font-size: 0.85rem;
+                    }
+                    .wallet-divider::before,
+                    .wallet-divider::after {
+                        content: '';
+                        flex: 1;
+                        height: 1px;
+                        background: #333;
+                    }
+                    body.light-mode .wallet-divider::before,
+                    body.light-mode .wallet-divider::after {
+                        background: #e9ecef;
+                    }
+                    .wallet-divider span {
+                        padding: 0 15px;
+                    }
+                    .install-options {
+                        text-align: center;
+                    }
+                    .install-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 12px 24px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: #fff;
+                        border-radius: 10px;
+                        text-decoration: none;
+                        font-weight: 500;
+                        transition: all 0.2s ease;
+                    }
+                    .install-btn:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+                    }
+                `;
+                document.head.appendChild(styles);
+            }
+            
+            document.body.appendChild(modal);
+        }
+
+        function closeWalletModal() {
+            const modal = document.getElementById('wallet-modal');
+            if (modal) {
+                modal.remove();
             }
         }
 
@@ -669,9 +934,18 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             const savedTheme = localStorage.getItem('theme');
+            
+            // الوضع الليلي هو الافتراضي دائماً
             if (savedTheme === 'light') {
                 document.body.classList.add('light-mode');
                 document.querySelector('.theme-icon').className = 'fas fa-sun theme-icon';
+            } else {
+                // تأكد من إزالة light-mode وحفظ الوضع الليلي
+                document.body.classList.remove('light-mode');
+                document.querySelector('.theme-icon').className = 'fas fa-moon theme-icon';
+                if (!savedTheme) {
+                    localStorage.setItem('theme', 'dark');
+                }
             }
             
             showStatus('Choose your preferred method to add the network', 'info');
