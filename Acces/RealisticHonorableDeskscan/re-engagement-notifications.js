@@ -272,138 +272,22 @@ async function sendReEngagementNotifications() {
 
 /**
  * Clean up old/expired push subscriptions
- * - Tests each subscription and removes invalid ones (410, 404, 403)
- * - Tests each subscription and removes invalid ones (410, 404, 403)
  * - Removes subscriptions older than 30 days that haven't been updated
- * - Keeps only hnsuees NOlinvaaid subscrtptuonsrrtmo er user to avoid duplicates
- * Runs daily - ensures NO invalid subscriptions remain
+ * - Keeps only the latest subscription per user to avoid duplicates
+ * Runs daily - very lightweight operation
  */
 async function cleanupOldSubscriptions() {
-  try { Starting intelligent push subscription cleanup...');
-   
-    let testedount = 0;
-    t vlidCout = 0;
-    let validDeleted = 0;
-    
-    // 1. First, test ALL active subscriptions and remove invalid ones
-    const allSubs = await pool.query(`
-      SELECT id, endpoint, p256dh, auth 
-      FROM push_subscriptions 
-      WHERE revoked_at IS NULL
-      ORDER BY created_at DESC
-      LIMIT 500
-    `);
-    
-    console.log(`🧹 [CLEANUP] Testin${allSubs.rws.ength} active subscriptions...`);
-    
-    for (const sub of allSubs.rows) {
-      testedCount++;
-      try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth }
-        };
-        
-        // Send silent test notification
-        await webpush.sendNotification(subscription, JSON.stringify({ 
-          type: 'cleanup-ping', 
-          silent: true,
-          timestamp: Date.now()
-        }));
-        
-        valiCount++;
-        
-        // Update last verified time
-        await pool.query('UPDATE push_subscriptions SET updated_at = NOW() WHERE id = $1', [sub.id]);
-        
-     } catch (Error) {
-       // 410 Gone, 404 Not Found, 403 Forbidden = INVALID 
-        if (pushError.statusCode === 410 || puhErrorstatusCode === 404 || pushErrorstatusCode === 403) {
-          await poolquery(DELETE FROM push_subscriptions WHERE id = $1', [sub.id]
-          invalidDeleted++;    console.log('🧹 [CLEANUP] Starting intelligent push subscription cleanup...');
-          console.log(`🧹 [CLEANUP] Deleted invalid subscription (${pushError.statusCode})`);
-        } else {
-           Other errors (429 rate limit, 500 server error) - keep subscription
-          validCount++;
-        }
-      }
-      
-      // Small delay to avoid rate limiting
-      if (testedCount % 50 === 0) {
-       await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    // 2.  (not updated)
-    let testedCount = 0;
-    let validCount = 0;
-    let invalidDeleted = 0;
-    
-    // 1. First, test ALL active subscriptions and remove invalid ones
-    const allSubs = await pool.query(`
-      S3. ELECT id, endpoint, p256dh, auth 
-      FROM push_subscriptions 
-      WHERE revoked_at IS NULL
-      ORDER BY created_at DESC
-      LIMIT 500
-    `);
-    
-    console.log(`🧹 [CLEANUP] Testing ${allSubs.rows.length} active subscriptions...`);
-    
-    for (const sub of allSubs.rows) {
-      testedCount++;
-      try {
-       4.  const subscription = {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth }
-        };
-        
-        // Send silent test notification
-        await webpush.sendNotification(subscription, JSON.stringify({ 
-          additiyne: 'cleanup-ping', 
-    const totalDeleted =  nvalidDeleted + addi i nimestamp:;
- a. ow()
-      }));Coplete:`);
-    cnsol.log(`   - Teste:sCount`);
-   cnoelg(`   - Valid: ${valid`);
-   consol.log(`   - Inval (410/404/403):invalidDeleted} eletd`);
-    conoelg(`   -Ol/D/Rd: ${adiialDeleeddelt
-      validCount` -Ttaemved:${talDeetd}`
+  try {
+    console.log('🧹 [CLEANUP] Cleaning old push subscriptions...');
 
-    return {         // Update last verified time
-      tested: test dCoun ,
-      valid: validCo wt,
-    at pool.querytalDeleted,
-      invalidDeleted,
-      addi(ion'UPDATE p
-   ush_subscriptions SET updated_at = NOW() WHERE id = $1', [sub.id]);
-        
-      } catch (pushError) {
-        // 410 Gone, 404 Not Found, 403 Forbidden = INVALID subscription
-        if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
-          await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
-          invalidDeleted++;
-          console.log(`🧹 [CLEANUP] Deleted invalid subscription (${pushError.statusCode})`);
-        } else {
-          // Other errors (429 rate limit, 500 server error) - keep subscription
-          validCount++;
-        }
-      }
-      
-      // Small delay to avoid rate limiting
-      if (testedCount % 50 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    // 2. Delete subscriptions older than 30 days (not updated)
+    // Delete subscriptions older than 30 days
     const oldResult = await pool.query(`
       DELETE FROM push_subscriptions 
       WHERE updated_at < NOW() - INTERVAL '30 days'
       AND revoked_at IS NULL
     `);
 
-    // 3. Delete duplicate subscriptions per user, keep only the latest
+    // Delete duplicate subscriptions per user, keep only the latest
     const dupResult = await pool.query(`
       DELETE FROM push_subscriptions 
       WHERE id NOT IN (
@@ -415,30 +299,22 @@ async function cleanupOldSubscriptions() {
       AND revoked_at IS NULL
     `);
 
-    // 4. Delete revoked subscriptions older than 7 days
+    // Delete revoked subscriptions older than 7 days
     const revokedResult = await pool.query(`
       DELETE FROM push_subscriptions 
       WHERE revoked_at IS NOT NULL 
       AND revoked_at < NOW() - INTERVAL '7 days'
     `);
 
-    const additionalDeleted = (oldResult.rowCount || 0) + (dupResult.rowCount || 0) + (revokedResult.rowCount || 0);
-    const totalDeleted = invalidDeleted + additionalDeleted;
+    const totalDeleted = (oldResult.rowCount || 0) + (dupResult.rowCount || 0) + (revokedResult.rowCount || 0);
     
-    console.log(`🧹 [CLEANUP] Complete:`);
-    console.log(`   - Tested: ${testedCount} subscriptions`);
-    console.log(`   - Valid: ${validCount}`);
-    console.log(`   - Invalid (410/404/403): ${invalidDeleted} deleted`);
-    console.log(`   - Old/Duplicate/Revoked: ${additionalDeleted} deleted`);
-    console.log(`   - Total removed: ${totalDeleted}`);
+    if (totalDeleted > 0) {
+      console.log(`🧹 [CLEANUP] Removed ${totalDeleted} old subscriptions (${oldResult.rowCount} expired, ${dupResult.rowCount} duplicates, ${revokedResult.rowCount} revoked)`);
+    } else {
+      console.log('🧹 [CLEANUP] No old subscriptions to clean');
+    }
 
-    return { 
-      tested: testedCount,
-      valid: validCount,
-      deleted: totalDeleted,
-      invalidDeleted,
-      additionalDeleted
-    };
+    return { deleted: totalDeleted };
   } catch (error) {
     console.log('🧹 [CLEANUP] Error:', error.message);
     return { deleted: 0, error: error.message };

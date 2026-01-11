@@ -496,17 +496,19 @@ async function sendWebPushNotificationToRecipient(transactionData) {
       return;
     }
 
-    // Prepare notification payload - FLAT STRUCTURE for Service Worker compatibility
+    // Prepare notification payload
     const payload = JSON.stringify({
-      type: 'transaction_received',
       title: 'Received ACCESS',
       body: `From: ${fromShort}\nAmount: ${amount} ACCESS`,
       tag: `access-tx-${transactionData.hash || Date.now()}`,
-      hash: transactionData.hash,
-      amount: amount,
-      from: fromAddress,
-      to: recipientWallet,
-      timestamp: Date.now()
+      data: {
+        type: 'transaction_received',
+        hash: transactionData.hash,
+        amount: amount,
+        from: fromAddress,
+        to: recipientWallet,
+        timestamp: Date.now()
+      }
     });
 
     // Send to all subscriptions
@@ -529,19 +531,30 @@ async function sendWebPushNotificationToRecipient(transactionData) {
         failCount++;
         console.log(`📱 [PUSH] ❌ Failed: ${pushError.message}, statusCode: ${pushError.statusCode}`);
         
-        // If subscription is invalid (410 Gone, 404, or 403 Forbidden/VAPID mismatch), DELETE it completely
+        // If subscription is invalid (410 Gone, 404, or 403 Forbidden/VAPID mismatch)
+        // DELETE it - Service Worker's pushsubscriptionchange will auto-renew
         if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
           await pool.query(
             'DELETE FROM push_subscriptions WHERE endpoint = $1',
             [sub.endpoint]
           );
-          console.log(`📱 [PUSH] 🗑️ Deleted invalid subscription (${pushError.statusCode}) - user must re-subscribe`);
+          console.log(`📱 [PUSH] 🗑️ Deleted expired subscription (${pushError.statusCode}) - will auto-renew on next app visit`);
+          
+          // Mark user for re-subscription notification via WebSocket
+          try {
+            // The client will auto-renew when they open the app
+            // No action needed here - Service Worker handles it
+          } catch (e) {
+            // Ignore
+          }
         }
       }
     }
 
     if (successCount > 0) {
       console.log(`📱 Web Push sent to ${successCount} devices for user ${userId}`);
+    } else if (failCount > 0) {
+      console.log(`📱 [PUSH] ⚠️ All ${failCount} subscriptions failed - user needs to reopen app to renew`);
     }
   } catch (error) {
     console.error('Error sending Web Push notification:', error);
@@ -1275,148 +1288,63 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // POST /api/push/test-subscription - Test if subscription is still valid (auto-cleanup invalid ones)
-    if (pathname === '/api/push/test-subscription' && req.method === 'POST') {
+    // POST /api/push/renew-subscription - Auto-renew expired subscription (Facebook/Instagram style)
+    if (pathname === '/api/push/renew-subscription' && req.method === 'POST') {
       try {
-        const { userId, endpoint } = await parseRequestBody(req);
+        const { oldEndpoint, newSubscription } = await parseRequestBody(req);
         
-        if (!endpoint) {
+        if (!newSubscription || !newSubscription.endpoint) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, valid: false, error: 'endpoint required' }));
+          res.end(JSON.stringify({ success: false, error: 'newSubscription required' }));
           return;
         }
 
-        // Check if subscription exists in database
-        const subResult = await pool.query(
-          'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE endpoint = $1 AND revoked_at IS NULL',
-          [endpoint]
-        );
-
-        if (subResult.rows.length === 0) {
-          // Subscription not in database - needs re-subscription
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, valid: false, reason: 'not_found' }));
-          return;
-        }
-
-        const sub = subResult.rows[0];
+        let userId = null;
         
-        // Try to send a silent test notification to verify subscription validity
-        try {
-          const subscription = {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth }
-          };
-          
-          // Send minimal test payload
-          const testPayload = JSON.stringify({ 
-            type: 'test', 
-            silent: true, 
-            timestamp: Date.now() 
-          });
-          
-          await webpush.sendNotification(subscription, testPayload);
-          
-          // Subscription is valid - update last verified time
-          await pool.query(
-            'UPDATE push_subscriptions SET updated_at = NOW() WHERE endpoint = $1',
-            [endpoint]
+        // Find user by old endpoint
+        if (oldEndpoint) {
+          const oldSubResult = await pool.query(
+            'SELECT user_id FROM push_subscriptions WHERE endpoint = $1',
+            [oldEndpoint]
           );
+          if (oldSubResult.rows.length > 0) {
+            userId = oldSubResult.rows[0].user_id;
+            // Delete old subscription
+            await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [oldEndpoint]);
+            console.log(`📱 [PUSH-RENEW] Deleted old subscription for user ${userId}`);
+          }
+        }
+
+        if (userId) {
+          // Save new subscription
+          const userAgent = req.headers['user-agent'] || '';
+          const p256dh = newSubscription.keys?.p256dh || '';
+          const auth = newSubscription.keys?.auth || '';
+
+          await pool.query(`
+            INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (endpoint) DO UPDATE SET
+              user_id = EXCLUDED.user_id,
+              p256dh = EXCLUDED.p256dh,
+              auth = EXCLUDED.auth,
+              user_agent = EXCLUDED.user_agent,
+              revoked_at = NULL,
+              updated_at = NOW()
+          `, [userId, newSubscription.endpoint, p256dh, auth, userAgent]);
+
+          console.log(`📱 [PUSH-RENEW] ✅ Subscription renewed for user ${userId}`);
           
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: true, valid: true }));
-          
-        } catch (pushError) {
-          console.log(`📱 [PUSH-TEST] Subscription test failed: ${pushError.statusCode} - ${pushError.message}`);
-          
-          // If subscription is invalid (410 Gone, 404, or 403), DELETE it and notify client
-          if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
-            await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
-            console.log(`📱 [PUSH-TEST] 🗑️ Auto-deleted invalid subscription (${pushError.statusCode}) - client will auto-resubscribe`);
-            
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
-              success: true, 
-              valid: false, 
-              reason: 'expired',
-              statusCode: pushError.statusCode,
-              autoResubscribe: true 
-            }));
-          } else {
-            // Other error - might be temporary, don't delete
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
-              success: true, 
-              valid: true, // Assume valid for temporary errors
-              warning: 'temporary_error',
-              statusCode: pushError.statusCode
-            }));
-          }
+          res.end(JSON.stringify({ success: true, message: 'Subscription renewed', userId }));
+        } else {
+          // No old subscription found - client will handle saving
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, message: 'No old subscription found', needsClientSave: true }));
         }
         return;
       } catch (error) {
-        console.error('Error testing push subscription:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, valid: false, error: error.message }));
-        return;
-      }
-    }
-
-    // POST /api/push/cleanup - Force cleanup of invalid subscriptions (admin/cron endpoint)
-    if (pathname === '/api/push/cleanup' && req.method === 'POST') {
-      try {
-        console.log('🧹 [PUSH-CLEANUP] Starting forced cleanup...');
-        
-        // Get all active subscriptions
-        const allSubs = await pool.query(
-          'SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE revoked_at IS NULL'
-        );
-        
-        let validCount = 0;
-        let invalidCount = 0;
-        let deletedEndpoints = [];
-        
-        for (const sub of allSubs.rows) {
-          try {
-            const subscription = {
-              endpoint: sub.endpoint,
-              keys: { p256dh: sub.p256dh, auth: sub.auth }
-            };
-            
-            // Try sending test notification
-            await webpush.sendNotification(subscription, JSON.stringify({ type: 'cleanup-test', silent: true }));
-            validCount++;
-            
-            // Update last verified time
-            await pool.query('UPDATE push_subscriptions SET updated_at = NOW() WHERE id = $1', [sub.id]);
-            
-          } catch (pushError) {
-            if (pushError.statusCode === 410 || pushError.statusCode === 404 || pushError.statusCode === 403) {
-              // Invalid subscription - delete it
-              await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [sub.id]);
-              invalidCount++;
-              deletedEndpoints.push(sub.endpoint.substring(0, 50) + '...');
-              console.log(`🧹 [PUSH-CLEANUP] Deleted invalid (${pushError.statusCode})`);
-            } else {
-              // Temporary error - keep it
-              validCount++;
-            }
-          }
-        }
-        
-        console.log(`🧹 [PUSH-CLEANUP] Complete: ${validCount} valid, ${invalidCount} deleted`);
-        
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          success: true, 
-          total: allSubs.rows.length,
-          valid: validCount,
-          deleted: invalidCount,
-          message: `Cleaned ${invalidCount} invalid subscriptions`
-        }));
-        return;
-      } catch (error) {
-        console.error('Error in push cleanup:', error);
+        console.error('Error renewing push subscription:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: error.message }));
         return;

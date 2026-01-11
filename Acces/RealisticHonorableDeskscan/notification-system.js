@@ -145,14 +145,19 @@ class AccessNotificationSystem {
       // Connect to WebSocket for real-time transaction updates
       this.connectWebSocket();
 
+      // 🔔 Listen for subscription renewal messages from Service Worker
+      navigator.serviceWorker.addEventListener('message', async (event) => {
+        if (event.data && event.data.type === 'SUBSCRIPTION_RENEWED') {
+          console.log('🔄 Received renewed subscription from Service Worker');
+          await this.saveRenewedSubscription(event.data.subscription);
+        }
+      });
+
       // 🔔 FACEBOOK/INSTAGRAM STYLE: إعادة الاشتراك التلقائية
       // إذا كان الإذن ممنوح سابقاً، نعيد الاشتراك تلقائياً كل مرة
       if (this.permission === 'granted') {
-        await this.autoResubscribe();
-        // 🔄 Start background health check for subscription validity
-        this.startSubscriptionHealthCheck();
-        // 🔄 Start background health check for subscription validity
-        this.startSubscriptionHealthCheck();
+        await this.forceNewSubscription(); // Always create fresh subscription on load
+        this.startAutoRenewalCheck(); // Start checking every 5 minutes
       }
       
       return true;
@@ -161,8 +166,122 @@ class AccessNotificationSystem {
       return false;
     }
   }
- 🔔 FACEBOOK/INSTAGRAM STYLE: إعادة الاشتراك التلقائية الذكية
-  // Auto-resubscribe silently without user intervention - like major apps do
+
+  // 🔔 Save renewed subscription from Service Worker
+  async saveRenewedSubscription(subscriptionData) {
+    try {
+      if (!this.userId) {
+        this.getUserWalletAddress();
+      }
+      
+      if (this.userId && subscriptionData) {
+        const saveResponse = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: this.userId,
+            subscription: subscriptionData
+          })
+        });
+        
+        const result = await saveResponse.json();
+        if (result.success) {
+          console.log('✅ Renewed subscription saved to server');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving renewed subscription:', error);
+    }
+  }
+
+  // 🔔 FACEBOOK/INSTAGRAM STYLE: Force create new subscription every time
+  async forceNewSubscription() {
+    try {
+      if (!this.registration) {
+        console.log('No service worker registration');
+        return false;
+      }
+
+      // Get VAPID public key from server
+      const response = await fetch('/api/push/public-key');
+      const data = await response.json();
+      
+      if (!data.success || !data.publicKey) {
+        console.error('Failed to get VAPID public key');
+        return false;
+      }
+
+      const vapidPublicKey = this.urlBase64ToUint8Array(data.publicKey);
+
+      // Always unsubscribe old and create new
+      const oldSub = await this.registration.pushManager.getSubscription();
+      if (oldSub) {
+        try {
+          await oldSub.unsubscribe();
+          console.log('🗑️ Old subscription cleared');
+        } catch (e) {
+          console.log('Could not unsubscribe old:', e.message);
+        }
+      }
+
+      // Create fresh subscription
+      const subscription = await this.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidPublicKey
+      });
+
+      this.pushSubscription = subscription;
+      console.log('✅ Fresh push subscription created');
+
+      // Save to server
+      if (!this.userId) {
+        this.getUserWalletAddress();
+      }
+
+      if (this.userId) {
+        const saveResponse = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: this.userId,
+            subscription: subscription.toJSON()
+          })
+        });
+
+        const saveData = await saveResponse.json();
+        if (saveData.success) {
+          console.log('✅ Push subscription saved to server - READY FOR NOTIFICATIONS');
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error creating fresh subscription:', error);
+      return false;
+    }
+  }
+
+  // 🔔 Auto-renewal check every 5 minutes - like Facebook/Instagram
+  startAutoRenewalCheck() {
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    
+    setInterval(async () => {
+      if (this.permission === 'granted') {
+        try {
+          const currentSub = await this.registration?.pushManager?.getSubscription();
+          if (!currentSub) {
+            console.log('🔄 No subscription found - creating new one...');
+            await this.forceNewSubscription();
+          }
+        } catch (error) {
+          console.log('🔄 Subscription check failed - renewing...');
+          await this.forceNewSubscription();
+        }
+      }
+    }, FIVE_MINUTES);
+    
+    console.log('🔔 Auto-renewal check started (every 5 minutes)');
+  }  // 🔔 FACEBOOK/INSTAGRAM STYLE: إعادة الاشتراك التلقائية الذكية
   async autoResubscribe() {
     try {
       if (!this.registration || !this.userId) {
@@ -172,38 +291,38 @@ class AccessNotificationSystem {
       // التحقق من الاشتراك الحالي
       const currentSub = await this.registration?.pushManager?.getSubscription();
       
-      if اختبار صلاحية الاشتراك عبر السيرفر
-        tr{
-          nst testResponse = await fetch('/api/push/test-subscription', {
-            thod: 'POST',
-            aders: { 'Content-Type': 'application/json' },
-            dy: JSON.stringify({
-              erId: this.userId,
-              dpoint: currentSub.endpoint
-            
-          ;
-          
-          nst testResult = await testResponse.json();
-          
-           (testResult.valid) {
-            nsole.log('✅ Push subscription is still valid');
-            is.pushSubscription = c  الاشترا️e
-          tao avoid unnecessary resubscribe
-            this.pushSubscription = currentSub;
+      if (currentSub) {
+        // اختبار صلاحية الاشتراك عبر السيرفر
+        const testResponse = await fetch('/api/push/test-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: this.userId,
+            endpoint: currentSub.endpoint
+          })
+        });
+        
+        const testResult = await testResponse.json();
+        
+        if (testResult.valid) {
+          console.log('✅ Push subscription is still valid');
+          this.pushSubscription = currentSub;
           return true;
         }
+        
+        console.log('⚠️ Push subscription expired/invalid, auto-resubscribing...');
       }
-       دشراك تلقائياً - بدون أي تدخل من المستخدم
-     cost success = await this.subscribeToWebPush()f (success) {
-        conso {g('🔔 Auto-resubscribed to push notifications (Facebook/Instagram style)');
-      }
-      return success;
+
+      // إعادة الاشتراك تلقائياً
+      await this.subscribeToWebPush();
+      console.log('🔔 Auto-resubscribed to push notifications (Facebook/Instagram style)');
+      return true;
       
-    } catch (error) {SRyated') {
-           .autoResubscribe();
-     
-    
-    console.log('🔄 Subscription health check enabled (every 6 hours)');
+    } catch (error) {
+      console.error('Auto-resubscribe error:', error);
+      // محاولة الاشتراك العادي كـ fallback
+      return await this.subscribeToWebPush();
+    }
   }
 
   // Subscribe to Web Push notifications (like YouTube)

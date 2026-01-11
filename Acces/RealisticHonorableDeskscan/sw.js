@@ -164,6 +164,79 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// 🔔 FACEBOOK/INSTAGRAM STYLE: Auto-renew subscription when it expires
+// This is THE KEY to making push notifications work like big apps
+self.addEventListener('pushsubscriptionchange', async (event) => {
+  console.log('🔄 Push subscription changed/expired - auto-renewing...');
+  
+  event.waitUntil((async () => {
+    try {
+      // Get VAPID public key from server
+      const response = await fetch('/api/push/public-key');
+      const data = await response.json();
+      
+      if (!data.success || !data.publicKey) {
+        console.error('Failed to get VAPID public key for renewal');
+        return;
+      }
+      
+      // Convert VAPID key to Uint8Array
+      const vapidPublicKey = urlBase64ToUint8Array(data.publicKey);
+      
+      // Create new subscription
+      const newSubscription = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidPublicKey
+      });
+      
+      console.log('✅ New subscription created automatically');
+      
+      // Get user ID from IndexedDB or localStorage via client
+      const clients = await self.clients.matchAll({ type: 'window' });
+      if (clients.length > 0) {
+        // Ask client for user ID
+        clients[0].postMessage({
+          type: 'SUBSCRIPTION_RENEWED',
+          subscription: newSubscription.toJSON()
+        });
+      }
+      
+      // Also try to save directly to server
+      try {
+        // Try to get userId from the old subscription's endpoint stored in DB
+        await fetch('/api/push/renew-subscription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            oldEndpoint: event.oldSubscription?.endpoint,
+            newSubscription: newSubscription.toJSON()
+          })
+        });
+        console.log('✅ Subscription renewed on server');
+      } catch (saveError) {
+        console.log('Will save subscription when client is active');
+      }
+      
+    } catch (error) {
+      console.error('Auto-renewal failed:', error);
+    }
+  })());
+});
+
+// Helper function for VAPID key conversion
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 // No caching - pass all requests to network
 self.addEventListener('fetch', (event) => {
   return;
@@ -187,24 +260,8 @@ self.addEventListener('push', (event) => {
     return; // Don't show notification if data is invalid
   }
 
-  // 🔇 SILENT NOTIFICATIONS - for subscription testing/cleanup (no visible notification)
-  if (data.silent === true || 
-      data.type === 'test' || 
-      data.type === 'cleanup-test' || 
-      data.type === 'cleanup-ping') {
-    console.log('Silent test/cleanup push - no notification shown');
-    return;
-  }
-
-  // � NORMALIZE DATA: Server sends data inside nested 'data' object sometimes
-  // Extract the actual transaction data from nested structure
-  let txData = data;
-  if (data.data && typeof data.data === 'object') {
-    txData = { ...data, ...data.data };
-  }
-
   // Don't show notification if no meaningful content
-  if (!txData.type && !txData.hash && !txData.amount && !txData.daysInactive && !txData.body && !txData.title) {
+  if (!data.type && !data.hash && !data.amount && !data.daysInactive) {
     console.log('Push with empty data - ignoring');
     return;
   }
@@ -212,33 +269,28 @@ self.addEventListener('push', (event) => {
   // Get device language
   const deviceLang = self.navigator?.language || 'en';
   
-  let title = data.title || 'Access Network';
-  let body = data.body || '';
+  let title = 'Access Network';
+  let body = '';
   
   // Handle different notification types
-  if (txData.type === 'transaction_received' && txData.amount) {
+  if (data.type === 'transaction_received' && data.amount) {
     // Transaction notification
     const t = getTranslation(deviceLang);
-    const fromShort = txData.from ? 
-      `${txData.from.substring(0, 6)}...${txData.from.substring(txData.from.length - 4)}` : 
+    const fromShort = data.from ? 
+      `${data.from.substring(0, 6)}...${data.from.substring(data.from.length - 4)}` : 
       '???';
-    title = t.receivedTitle || 'Received ACCESS';
-    body = `${t.amount || 'Amount'}: ${txData.amount} ACCESS\n${t.from || 'From'}: ${fromShort}`;
-  } else if (txData.type === 're-engagement' && txData.daysInactive) {
+    body = `${t.newTx}\n${t.amount}: ${data.amount} ACCESS\n${t.from}: ${fromShort}`;
+  } else if (data.type === 're-engagement' && data.daysInactive) {
     // Re-engagement notification - translate based on device language
-    const msg = getReEngagementMessage(deviceLang, txData.daysInactive);
+    const msg = getReEngagementMessage(deviceLang, data.daysInactive);
     title = msg.title;
     body = msg.body;
-  } else if (!body && txData.amount) {
-    // Fallback for transaction with amount but no specific type
+  } else if (data.body) {
+    body = data.body;
+    if (data.title) title = data.title;
+  } else {
     const t = getTranslation(deviceLang);
-    title = t.receivedTitle || 'Received ACCESS';
-    body = `${t.amount || 'Amount'}: ${txData.amount} ACCESS`;
-  }
-
-  // Final fallback - use whatever title/body we have
-  if (!body) {
-    body = data.body || getTranslation(deviceLang).newTx || 'New notification';
+    body = t.newTx;
   }
 
   const options = {
