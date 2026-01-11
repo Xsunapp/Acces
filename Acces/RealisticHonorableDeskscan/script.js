@@ -10519,7 +10519,7 @@ if (totalCost > (currentBalance + precision)) {
     // Show More button (only if there are more to show)
     if (displayed < total) {
       buttonsHtml += `
-        <button onclick="showMoreTransactions()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+        <button onclick="showMoreTransactions()" style="padding: 10px 20px; background: #7c3aed; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
           <i class="fas fa-chevron-down"></i> ${showMoreText} (${displayed}/${total})
         </button>
       `;
@@ -10896,7 +10896,7 @@ if (totalCost > (currentBalance + precision)) {
     }
 
     if (displayed < total) {
-      buttonsHtml += `<button onclick="showMoreFiltered()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;"><i class="fas fa-chevron-down"></i> ${showMoreText} (${displayed}/${total})</button>`;
+      buttonsHtml += `<button onclick="showMoreFiltered()" style="padding: 10px 20px; background: #7c3aed; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px;"><i class="fas fa-chevron-down"></i> ${showMoreText} (${displayed}/${total})</button>`;
     }
 
     if (displayed > 25 || window.currentTxFilter !== 'all' || window.currentTxSearch) {

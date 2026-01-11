@@ -273,17 +273,17 @@ async function sendReEngagementNotifications() {
 /**
  * Clean up old/expired push subscriptions
  * - Tests each subscription and removes invalid ones (410, 404, 403)
+ * - Tests each subscription and removes invalid ones (410, 404, 403)
  * - Removes subscriptions older than 30 days that haven't been updated
- * - Keeps only the latest subscription per user to avoid duplicates
+ * - Keeps only hnsuees NOlinvaaid subscrtptuonsrrtmo er user to avoid duplicates
  * Runs daily - ensures NO invalid subscriptions remain
  */
 async function cleanupOldSubscriptions() {
-  try {
-    console.log('🧹 [CLEANUP] Starting intelligent push subscription cleanup...');
-    
-    let testedCount = 0;
-    let validCount = 0;
-    let invalidDeleted = 0;
+  try { Starting intelligent push subscription cleanup...');
+   
+    let testedount = 0;
+    t vlidCout = 0;
+    let validDeleted = 0;
     
     // 1. First, test ALL active subscriptions and remove invalid ones
     const allSubs = await pool.query(`
@@ -294,7 +294,7 @@ async function cleanupOldSubscriptions() {
       LIMIT 500
     `);
     
-    console.log(`🧹 [CLEANUP] Testing ${allSubs.rows.length} active subscriptions...`);
+    console.log(`🧹 [CLEANUP] Testin${allSubs.rws.ength} active subscriptions...`);
     
     for (const sub of allSubs.rows) {
       testedCount++;
@@ -311,10 +311,72 @@ async function cleanupOldSubscriptions() {
           timestamp: Date.now()
         }));
         
-        validCount++;
+        valiCount++;
         
         // Update last verified time
         await pool.query('UPDATE push_subscriptions SET updated_at = NOW() WHERE id = $1', [sub.id]);
+        
+     } catch (Error) {
+       // 410 Gone, 404 Not Found, 403 Forbidden = INVALID 
+        if (pushError.statusCode === 410 || puhErrorstatusCode === 404 || pushErrorstatusCode === 403) {
+          await poolquery(DELETE FROM push_subscriptions WHERE id = $1', [sub.id]
+          invalidDeleted++;    console.log('🧹 [CLEANUP] Starting intelligent push subscription cleanup...');
+          console.log(`🧹 [CLEANUP] Deleted invalid subscription (${pushError.statusCode})`);
+        } else {
+           Other errors (429 rate limit, 500 server error) - keep subscription
+          validCount++;
+        }
+      }
+      
+      // Small delay to avoid rate limiting
+      if (testedCount % 50 === 0) {
+       await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // 2.  (not updated)
+    let testedCount = 0;
+    let validCount = 0;
+    let invalidDeleted = 0;
+    
+    // 1. First, test ALL active subscriptions and remove invalid ones
+    const allSubs = await pool.query(`
+      S3. ELECT id, endpoint, p256dh, auth 
+      FROM push_subscriptions 
+      WHERE revoked_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 500
+    `);
+    
+    console.log(`🧹 [CLEANUP] Testing ${allSubs.rows.length} active subscriptions...`);
+    
+    for (const sub of allSubs.rows) {
+      testedCount++;
+      try {
+       4.  const subscription = {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth }
+        };
+        
+        // Send silent test notification
+        await webpush.sendNotification(subscription, JSON.stringify({ 
+          additiyne: 'cleanup-ping', 
+    const totalDeleted =  nvalidDeleted + addi i nimestamp:;
+ a. ow()
+      }));Coplete:`);
+    cnsol.log(`   - Teste:sCount`);
+   cnoelg(`   - Valid: ${valid`);
+   consol.log(`   - Inval (410/404/403):invalidDeleted} eletd`);
+    conoelg(`   -Ol/D/Rd: ${adiialDeleeddelt
+      validCount` -Ttaemved:${talDeetd}`
+
+    return {         // Update last verified time
+      tested: test dCoun ,
+      valid: validCo wt,
+    at pool.querytalDeleted,
+      invalidDeleted,
+      addi(ion'UPDATE p
+   ush_subscriptions SET updated_at = NOW() WHERE id = $1', [sub.id]);
         
       } catch (pushError) {
         // 410 Gone, 404 Not Found, 403 Forbidden = INVALID subscription

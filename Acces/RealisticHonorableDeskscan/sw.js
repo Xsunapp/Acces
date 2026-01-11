@@ -196,8 +196,15 @@ self.addEventListener('push', (event) => {
     return;
   }
 
+  // � NORMALIZE DATA: Server sends data inside nested 'data' object sometimes
+  // Extract the actual transaction data from nested structure
+  let txData = data;
+  if (data.data && typeof data.data === 'object') {
+    txData = { ...data, ...data.data };
+  }
+
   // Don't show notification if no meaningful content
-  if (!data.type && !data.hash && !data.amount && !data.daysInactive) {
+  if (!txData.type && !txData.hash && !txData.amount && !txData.daysInactive && !txData.body && !txData.title) {
     console.log('Push with empty data - ignoring');
     return;
   }
@@ -205,28 +212,33 @@ self.addEventListener('push', (event) => {
   // Get device language
   const deviceLang = self.navigator?.language || 'en';
   
-  let title = 'Access Network';
-  let body = '';
+  let title = data.title || 'Access Network';
+  let body = data.body || '';
   
   // Handle different notification types
-  if (data.type === 'transaction_received' && data.amount) {
+  if (txData.type === 'transaction_received' && txData.amount) {
     // Transaction notification
     const t = getTranslation(deviceLang);
-    const fromShort = data.from ? 
-      `${data.from.substring(0, 6)}...${data.from.substring(data.from.length - 4)}` : 
+    const fromShort = txData.from ? 
+      `${txData.from.substring(0, 6)}...${txData.from.substring(txData.from.length - 4)}` : 
       '???';
-    body = `${t.newTx}\n${t.amount}: ${data.amount} ACCESS\n${t.from}: ${fromShort}`;
-  } else if (data.type === 're-engagement' && data.daysInactive) {
+    title = t.receivedTitle || 'Received ACCESS';
+    body = `${t.amount || 'Amount'}: ${txData.amount} ACCESS\n${t.from || 'From'}: ${fromShort}`;
+  } else if (txData.type === 're-engagement' && txData.daysInactive) {
     // Re-engagement notification - translate based on device language
-    const msg = getReEngagementMessage(deviceLang, data.daysInactive);
+    const msg = getReEngagementMessage(deviceLang, txData.daysInactive);
     title = msg.title;
     body = msg.body;
-  } else if (data.body) {
-    body = data.body;
-    if (data.title) title = data.title;
-  } else {
+  } else if (!body && txData.amount) {
+    // Fallback for transaction with amount but no specific type
     const t = getTranslation(deviceLang);
-    body = t.newTx;
+    title = t.receivedTitle || 'Received ACCESS';
+    body = `${t.amount || 'Amount'}: ${txData.amount} ACCESS`;
+  }
+
+  // Final fallback - use whatever title/body we have
+  if (!body) {
+    body = data.body || getTranslation(deviceLang).newTx || 'New notification';
   }
 
   const options = {
